@@ -1,63 +1,89 @@
 <template>
-  <div id="app" class="app-container" :style="backgroundStyle">
-    <!-- 顶部导航栏 -->
-    <header class="app-header">
-      <div class="header-left">
-        <div class="app-logo">
-          <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-            <rect width="32" height="32" rx="8" fill="#4F46E5"/>
-            <path d="M8 12h16v8H8z" fill="white" fill-opacity="0.9"/>
-            <circle cx="12" cy="14" r="2" fill="#4F46E5"/>
-            <circle cx="20" cy="14" r="2" fill="#4F46E5"/>
-          </svg>
-          <h1 class="app-title">图片管理器</h1>
-        </div>
-      </div>
-
-      <div class="header-center">
-        <div class="stats-info">
-          <span class="stats-item">
-            <i class="icon-folder"></i>
-            {{ watchedPaths.length }} 个路径
-          </span>
-          <span class="stats-item">
-            <i class="icon-image"></i>
-            {{ totalImages }} 张图片
-          </span>
-          <span v-if="!configLoaded" class="loading-text">加载中...</span>
-        </div>
-      </div>
-
-      <div class="header-right">
-        <button @click="showBackgroundManager = true" class="btn btn-secondary">
-          <i class="icon-image"></i>
-          背景设置
-        </button>
-        <button @click="showPathManager = true" class="btn btn-secondary">
-          <i class="icon-settings"></i>
-          管理路径
-        </button>
-        <button @click="addPath" class="btn btn-primary">
-          <i class="icon-plus"></i>
+  <div id="app" class="explorer-container">
+    <!-- Windows 风格工具栏 -->
+    <header class="explorer-header">
+      <div class="header-toolbar">
+        <button @click="addPath" class="toolbar-btn">
+          <i class="icon-folder"></i>
           添加路径
         </button>
-        <button @click="refresh" class="btn btn-secondary">
+        <button @click="refresh" class="toolbar-btn">
           <i class="icon-refresh"></i>
           刷新
         </button>
+        <button @click="showPathManager = true" class="toolbar-btn">
+          <i class="icon-settings"></i>
+          管理路径
+        </button>
+      </div>
+
+      <!-- 路径显示栏 -->
+      <div class="path-bar">
+        <div class="path-label">当前路径:</div>
+        <div class="path-display">
+          <span v-if="currentPath" class="current-path">{{ currentPath }}</span>
+          <span v-else class="no-path">请选择或添加路径</span>
+        </div>
+      </div>
+
+      <!-- 排序控制栏 -->
+      <div class="sort-bar" v-if="sortedFolders.length > 0">
+        <div class="sort-controls">
+          <span class="sort-label">排序方式:</span>
+          <button
+            @click="setSortBy('name')"
+            :class="['sort-btn', { active: sortBy === 'name' }]"
+          >
+            名称
+          </button>
+          <button
+            @click="setSortBy('time')"
+            :class="['sort-btn', { active: sortBy === 'time' }]"
+          >
+            修改时间
+          </button>
+          <button
+            @click="setSortBy('count')"
+            :class="['sort-btn', { active: sortBy === 'count' }]"
+          >
+            文件数量
+          </button>
+          <button
+            @click="toggleSortOrder"
+            :class="['sort-btn', { active: sortOrder === 'desc' }]"
+          >
+            {{ sortOrder === 'asc' ? '↑' : '↓' }}
+          </button>
+        </div>
       </div>
     </header>
 
     <!-- 主要内容区域 -->
-    <main class="app-main">
-      <!-- 侧边栏 -->
-      <aside class="app-sidebar">
-        <div class="sidebar-header">
-          <h2>文件夹</h2>
-          <span class="folder-count">{{ sortedFolders.length }}</span>
+    <main class="explorer-main">
+      <!-- 文件夹列表 -->
+      <div class="folder-list-container">
+        <div class="list-header">
+          <div class="col-name" @click="setSortBy('name')">
+            名称
+            <span v-if="sortBy === 'name'" class="sort-indicator">
+              {{ sortOrder === 'asc' ? '↑' : '↓' }}
+            </span>
+          </div>
+          <div class="col-time" @click="setSortBy('time')">
+            修改时间
+            <span v-if="sortBy === 'time'" class="sort-indicator">
+              {{ sortOrder === 'asc' ? '↑' : '↓' }}
+            </span>
+          </div>
+          <div class="col-count" @click="setSortBy('count')">
+            图片数量
+            <span v-if="sortBy === 'count'" class="sort-indicator">
+              {{ sortOrder === 'asc' ? '↑' : '↓' }}
+            </span>
+          </div>
         </div>
 
-        <div class="sidebar-content">
+        <div class="folder-list">
           <div v-if="loading" class="loading-state">
             <div class="spinner"></div>
             <span>加载中...</span>
@@ -69,102 +95,67 @@
             <p>添加路径开始管理您的图片</p>
           </div>
 
-          <div v-else class="folder-list">
+          <div v-else>
             <div
               v-for="folder in sortedFolders"
               :key="folder.path"
               @click="selectFolder(folder)"
-              class="folder-item"
-              :class="{ active: selectedFolder?.path === folder.path }"
+              class="folder-row"
+              :class="{ selected: selectedFolder?.path === folder.path }"
             >
-              <div class="folder-icon">
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                  <path d="M2 5.5h6l2 3h7v7a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-10a2 2 0 0 1 2-2z" fill="currentColor"/>
-                </svg>
+              <div class="col-name">
+                <div class="folder-icon">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path d="M1.5 2.5h5l1.5 2h6v8a1 1 0 0 1-1 1h-10a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1z" fill="#4285f4"/>
+                  </svg>
+                </div>
+                <span class="folder-name">{{ folder.name }}</span>
               </div>
-              <div class="folder-info">
-                <div class="folder-name">{{ folder.name }}</div>
-                <div class="folder-meta">
-                  <span class="image-count">{{ folder.imageCount }} 张图片</span>
-                  <span class="folder-date">{{ formatDate(folder.lastModified) }}</span>
+              <div class="col-time">{{ formatDateTime(folder.lastModified) }}</div>
+              <div class="col-count">{{ folder.imageCount }} 张</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 图片列表视图 -->
+      <div class="image-list-container" v-if="selectedFolder">
+        <div class="image-list-header">
+          <h3>{{ selectedFolder.name }} - 图片列表</h3>
+          <div class="image-count">{{ allImages.length }} 张图片</div>
+        </div>
+
+        <div class="image-list">
+          <div v-if="loadingImages" class="loading-state">
+            <div class="spinner"></div>
+            <span>加载图片中...</span>
+          </div>
+
+          <div v-else-if="allImages.length === 0" class="empty-state">
+            <div class="empty-icon">🖼️</div>
+            <h3>该文件夹暂无图片</h3>
+          </div>
+
+          <div v-else class="image-grid-list">
+            <div
+              v-for="image in allImages"
+              :key="image.path"
+              class="image-item"
+              @click="openImageViewer(image)"
+            >
+              <div class="image-thumb">
+                <img :src="getImageUrl(image.path)" :alt="image.name" />
+              </div>
+              <div class="image-info">
+                <div class="image-name">{{ image.name }}</div>
+                <div class="image-meta">
+                  {{ formatFileSize(image.size) }} • {{ formatDate(image.lastModified) }}
                 </div>
               </div>
-              <div class="folder-arrow">
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                  <path d="M6 12l4-4-4-4" stroke="currentColor" stroke-width="2" fill="none"/>
-                </svg>
-              </div>
             </div>
           </div>
         </div>
-      </aside>
-
-      <!-- 主内容区 -->
-      <section class="app-content">
-        <!-- 图片预览区 -->
-        <div class="preview-section">
-          <div class="preview-header">
-            <div class="preview-info" v-if="selectedFolder">
-              <h3>{{ selectedFolder.name }}</h3>
-              <p>{{ selectedImage ? getFileName(selectedImage.path) : '请选择图片' }}</p>
-            </div>
-
-            <div class="preview-controls" v-if="currentImages.length > 0">
-              <button @click="previousImage" :disabled="!hasPrevious" class="btn-icon">
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                  <path d="M12 15l-6-6 6-6" stroke="currentColor" stroke-width="2" fill="none"/>
-                </svg>
-              </button>
-              <span class="image-counter">{{ currentImageIndex + 1 }} / {{ currentImages.length }}</span>
-              <button @click="nextImage" :disabled="!hasNext" class="btn-icon">
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                  <path d="M8 15l6-6-6-6" stroke="currentColor" stroke-width="2" fill="none"/>
-                </svg>
-              </button>
-            </div>
-          </div>
-
-          <div class="preview-area">
-            <div v-if="selectedImage" class="image-preview">
-              <img
-                :src="getImageUrl(selectedImage.path)"
-                :alt="selectedImage.name"
-                @click="openFullscreen"
-                class="preview-image"
-              />
-            </div>
-            <div v-else class="no-preview">
-              <div class="no-preview-icon">🖼️</div>
-              <h3>选择图片预览</h3>
-              <p>点击下方缩略图查看图片</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- 图片网格 -->
-        <div class="image-grid-section" v-if="allImages.length > 0">
-          <div class="grid-header">
-            <h4>图片缩略图</h4>
-            <div class="grid-info">
-              共 {{ allImages.length }} 张图片
-            </div>
-          </div>
-
-          <div class="image-grid">
-            <div
-              v-for="image in currentImages"
-              :key="image.path"
-              @click="selectImage(image)"
-              class="image-thumbnail"
-              :class="{ selected: selectedImage?.path === image.path }"
-            >
-              <img :src="getImageUrl(image.path)" :alt="image.name" />
-              <div class="image-name">{{ image.name }}</div>
-            </div>
-
-          </div>
-        </div>
-      </section>
+      </div>
     </main>
 
     <!-- 路径管理对话框 -->
@@ -209,48 +200,6 @@
         </div>
       </div>
     </div>
-
-    <!-- 背景图片管理对话框 -->
-    <div v-if="showBackgroundManager" class="modal-overlay" @click="showBackgroundManager = false">
-      <div class="modal-content" @click.stop>
-        <div class="modal-header">
-          <h3>背景图片设置</h3>
-          <button @click="showBackgroundManager = false" class="btn-close">×</button>
-        </div>
-
-        <div class="modal-body">
-          <div class="background-controls">
-            <div class="control-group">
-              <label>背景透明度</label>
-              <input
-                type="range"
-                v-model="backgroundOpacity"
-                min="0"
-                max="1"
-                step="0.1"
-                @change="saveConfig"
-              >
-              <span class="opacity-value">{{ Math.round(backgroundOpacity * 100) }}%</span>
-            </div>
-
-            <div class="control-group" v-if="backgroundImage">
-              <label>当前背景</label>
-              <div class="current-background">
-                <img :src="backgroundImage" alt="当前背景" class="background-preview">
-                <button @click="removeBackgroundImage" class="btn-remove-background">
-                  移除背景
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="modal-footer">
-          <button @click="setBackgroundImage" class="btn btn-primary">选择新背景</button>
-          <button @click="showBackgroundManager = false" class="btn btn-secondary">关闭</button>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -262,19 +211,14 @@ export default {
       folderStats: new Map(),
       selectedFolder: null,
       allImages: [],
-      currentImages: [],
-      selectedImage: null,
       loading: false,
       loadingImages: false,
-      currentPage: 0,
-      pageSize: 20,
-      hasMoreImages: false,
       configLoaded: false,
       showPathManager: false,
-      showBackgroundManager: false,
-      backgroundImage: null, // 背景图片
-      backgroundOpacity: 0.3, // 背景图片透明度
-      loadedImages: new Set() // 跟踪已加载的图片
+      sortBy: 'count',
+      sortOrder: 'desc',
+      currentPath: '',
+      loadedImages: new Set()
     }
   },
   computed: {
@@ -287,38 +231,25 @@ export default {
           })
         }
       })
-      return allFolders.sort((a, b) => b.imageCount - a.imageCount)
+
+      return allFolders.sort((a, b) => {
+        let comparison = 0
+        switch (this.sortBy) {
+          case 'name':
+            comparison = a.name.localeCompare(b.name)
+            break
+          case 'time':
+            comparison = new Date(a.lastModified) - new Date(b.lastModified)
+            break
+          case 'count':
+            comparison = a.imageCount - b.imageCount
+            break
+        }
+        return this.sortOrder === 'asc' ? comparison : -comparison
+      })
     },
     totalImages() {
       return this.sortedFolders.reduce((total, folder) => total + folder.imageCount, 0)
-    },
-    currentImageIndex() {
-      if (!this.selectedImage) return -1
-      return this.currentImages.findIndex(img => img.path === this.selectedImage.path)
-    },
-    hasPrevious() {
-      return this.currentImageIndex > 0
-    },
-    hasNext() {
-      return this.currentImageIndex < this.currentImages.length - 1
-    },
-    // 背景样式
-    backgroundStyle() {
-      const baseGradient = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-
-      if (this.backgroundImage) {
-        return {
-          background: `
-            ${baseGradient},
-            url(${this.backgroundImage}) center/cover
-          `,
-          backgroundBlendMode: 'overlay'
-        }
-      }
-
-      return {
-        background: baseGradient
-      }
     }
   },
   methods: {
@@ -329,6 +260,7 @@ export default {
           if (folderPath) {
             if (!this.watchedPaths.includes(folderPath)) {
               this.watchedPaths.push(folderPath)
+              this.currentPath = folderPath
               await this.refreshFolderStats(folderPath)
               await this.saveConfig()
             } else {
@@ -359,19 +291,21 @@ export default {
       }
     },
 
-    // 移除路径
     async removePath(pathToRemove) {
       try {
         this.watchedPaths = this.watchedPaths.filter(path => path !== pathToRemove)
         this.folderStats.delete(pathToRemove)
         await this.saveConfig()
 
-        // 如果移除的是当前选中的文件夹，清除选择
+        if (this.watchedPaths.length > 0) {
+          this.currentPath = this.watchedPaths[0]
+        } else {
+          this.currentPath = ''
+        }
+
         if (this.selectedFolder && this.selectedFolder.path.startsWith(pathToRemove)) {
           this.selectedFolder = null
           this.allImages = []
-          this.currentImages = []
-          this.selectedImage = null
         }
       } catch (error) {
         console.error('Error removing path:', error)
@@ -379,16 +313,13 @@ export default {
       }
     },
 
-    // 加载配置
     async loadConfig() {
       try {
         if (window.electronAPI) {
           const config = await window.electronAPI.loadConfig()
           if (config) {
             this.watchedPaths = config.watchedPaths || []
-            this.backgroundImage = config.backgroundImage || null
-            this.backgroundOpacity = config.backgroundOpacity || 0.1
-            // 自动加载所有已保存的路径
+            this.currentPath = this.watchedPaths[0] || ''
             for (const path of this.watchedPaths) {
               await this.refreshFolderStats(path)
             }
@@ -401,14 +332,11 @@ export default {
       }
     },
 
-    // 保存配置
     async saveConfig() {
       try {
         if (window.electronAPI) {
           const config = {
             watchedPaths: this.watchedPaths,
-            backgroundImage: this.backgroundImage,
-            backgroundOpacity: this.backgroundOpacity,
             lastUpdated: new Date().toISOString()
           }
           await window.electronAPI.saveConfig(config)
@@ -416,28 +344,6 @@ export default {
       } catch (error) {
         console.error('Error saving config:', error)
       }
-    },
-
-    // 设置背景图片
-    async setBackgroundImage() {
-      try {
-        if (window.electronAPI) {
-          const imagePath = await window.electronAPI.selectImage()
-          if (imagePath) {
-            this.backgroundImage = `local:///${imagePath.replace(/\\/g, '/')}`
-            await this.saveConfig()
-          }
-        }
-      } catch (error) {
-        console.error('Error setting background image:', error)
-        alert('设置背景图片失败: ' + error.message)
-      }
-    },
-
-    // 移除背景图片
-    async removeBackgroundImage() {
-      this.backgroundImage = null
-      await this.saveConfig()
     },
 
     async refreshFolderStats(folderPath) {
@@ -456,26 +362,13 @@ export default {
     async selectFolder(folder) {
       try {
         this.selectedFolder = folder
-        this.selectedImage = null
         this.allImages = []
-        this.currentImages = []
         this.loadedImages.clear()
-        this.currentPage = 0
-        this.hasMoreImages = false
 
         if (window.electronAPI) {
           this.loadingImages = true
           const images = await window.electronAPI.getImagesInFolder(folder.path)
           this.allImages = images || []
-
-          // 一次性加载所有缩略图
-          this.loadAllThumbnails()
-
-          if (this.currentImages.length > 0) {
-            this.selectedImage = this.currentImages[0]
-            // 预加载第一张图片
-            this.loadImageLazy(this.currentImages[0])
-          }
         }
       } catch (error) {
         console.error('Error selecting folder:', error)
@@ -485,58 +378,17 @@ export default {
       }
     },
 
-    selectImage(image) {
-      this.selectedImage = image
-      // 懒加载选中的图片
-      this.loadImageLazy(image)
-
-      // 预加载相邻的图片
-      const currentIndex = this.allImages.findIndex(img => img.path === image.path)
-      if (currentIndex > 0) {
-        this.loadImageLazy(this.allImages[currentIndex - 1])
-      }
-      if (currentIndex < this.allImages.length - 1) {
-        this.loadImageLazy(this.allImages[currentIndex + 1])
+    setSortBy(sortType) {
+      if (this.sortBy === sortType) {
+        this.toggleSortOrder()
+      } else {
+        this.sortBy = sortType
+        this.sortOrder = 'desc'
       }
     },
 
-    previousImage() {
-      if (this.hasPrevious) {
-        const prevIndex = this.currentImageIndex - 1
-        this.selectedImage = this.currentImages[prevIndex]
-        // 懒加载上一张图片
-        this.loadImageLazy(this.selectedImage)
-      }
-    },
-
-    nextImage() {
-      if (this.hasNext) {
-        const nextIndex = this.currentImageIndex + 1
-        this.selectedImage = this.currentImages[nextIndex]
-        // 懒加载下一张图片
-        this.loadImageLazy(this.selectedImage)
-      }
-    },
-
-    loadAllThumbnails() {
-      // 一次性加载所有缩略图
-      this.currentImages = [...this.allImages]
-      this.hasMoreImages = false
-      this.currentPage = 1
-    },
-
-    loadImageLazy(image) {
-      // 懒加载单张图片
-      if (image && !this.loadedImages.has(image.path)) {
-        this.loadedImages.add(image.path)
-        const img = new Image()
-        img.src = this.getImageUrl(image.path)
-      }
-    },
-
-    loadMoreImages() {
-      // 保留这个方法来保持兼容性
-      return
+    toggleSortOrder() {
+      this.sortOrder = this.sortOrder === 'asc' ? 'desc' : 'asc'
     },
 
     getImageUrl(imagePath) {
@@ -573,222 +425,251 @@ export default {
       })
     },
 
-    openFullscreen() {
-      if (this.selectedImage) {
-        const img = new Image()
-        img.src = this.getImageUrl(this.selectedImage.path)
-        img.onload = () => {
-          const newWindow = window.open('', '_blank')
-          if (newWindow) {
-            newWindow.document.write(`
-              <html>
-                <head><title>${this.selectedImage.name}</title></head>
-                <body style="margin:0;display:flex;justify-content:center;align-items:center;height:100vh;background:#000;">
-                  <img src="${this.getImageUrl(this.selectedImage.path)}" style="max-width:100%;max-height:100%;object-fit:contain;" />
-                </body>
-              </html>
-            `)
-            newWindow.document.close()
-          }
+    formatDateTime(date) {
+      return new Date(date).toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    },
+
+    formatFileSize(bytes) {
+      if (!bytes) return '未知大小'
+      const sizes = ['B', 'KB', 'MB', 'GB']
+      const i = Math.floor(Math.log(bytes) / Math.log(1024))
+      return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i]
+    },
+
+    openImageViewer(image) {
+      const img = new Image()
+      img.src = this.getImageUrl(image.path)
+      img.onload = () => {
+        const newWindow = window.open('', '_blank')
+        if (newWindow) {
+          newWindow.document.write(`
+            <html>
+              <head>
+                <title>${image.name}</title>
+                <style>
+                  body { margin:0;display:flex;justify-content:center;align-items:center;height:100vh;background:#f5f5f5; }
+                  img { max-width:100%;max-height:100%;object-fit:contain;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15); }
+                </style>
+              </head>
+              <body>
+                <img src="${this.getImageUrl(image.path)}" />
+              </body>
+            </html>
+          `)
+          newWindow.document.close()
         }
       }
     }
   },
   async mounted() {
     console.log('App mounted, Electron API available:', !!window.electronAPI)
-    // 启动时自动加载配置
     await this.loadConfig()
   }
 }
 </script>
 
 <style scoped>
-.app-container {
+.explorer-container {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  font-family: 'SF Pro Display', 'Segoe UI', 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif;
-  background: #0F1419;
-  color: #FFFFFF;
+  font-family: 'Segoe UI', 'Microsoft YaHei', Arial, sans-serif;
+  background: #ffffff;
+  color: #333333;
 }
 
-/* CSS Variables for theming */
-.app-container {
-  --bg-primary: #0F1419;
-  --bg-secondary: #1E2328;
-  --bg-tertiary: #2D3748;
-  --bg-card: rgba(30, 35, 40, 0.8);
-  --accent-primary: #00D4FF;
-  --accent-secondary: #0EA5E9;
-  --text-primary: #FFFFFF;
-  --text-secondary: #E5E7EB;
-  --text-muted: #9CA3AF;
-  --border-color: #374151;
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
+.explorer-header {
+  background: #f8f9fa;
+  border-bottom: 1px solid #e1e5e9;
+  padding: 0;
 }
 
-/* 顶部导航 */
-.app-header {
-  height: 44px;
-  background: var(--bg-card);
-  backdrop-filter: blur(10px);
-  border-bottom: 1px solid var(--border-color);
-  display: flex;
-  align-items: center;
-  padding: 0 16px;
-  box-shadow: var(--shadow-md);
-  position: relative;
-  z-index: 10;
-}
-
-.header-left {
-  flex: 0 0 auto;
-}
-
-.app-logo {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.app-title {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-primary);
-  font-family: 'JetBrains Mono', 'SF Mono', monospace;
-  letter-spacing: -0.025em;
-}
-
-.header-center {
-  flex: 1;
-  display: flex;
-  justify-content: center;
-}
-
-.stats-info {
-  display: flex;
-  gap: 16px;
-}
-
-.stats-item {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 500;
-}
-
-.header-right {
-  flex: 0 0 auto;
+.header-toolbar {
   display: flex;
   gap: 8px;
+  padding: 8px 16px;
+  border-bottom: 1px solid #e1e5e9;
 }
 
-.btn {
+.toolbar-btn {
   padding: 6px 12px;
-  border: none;
-  border-radius: 6px;
+  background: #ffffff;
+  border: 1px solid #d1d9e0;
+  border-radius: 3px;
   font-size: 12px;
-  font-weight: 500;
+  color: #333333;
   cursor: pointer;
   display: flex;
   align-items: center;
   gap: 4px;
-  transition: all 0.2s;
+  transition: all 0.15s ease;
 }
 
-.btn-primary {
-  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
-  color: var(--bg-primary);
-  font-weight: 600;
+.toolbar-btn:hover {
+  background: #e3f2fd;
+  border-color: #2196f3;
 }
 
-.btn-primary:hover {
-  background: linear-gradient(135deg, var(--accent-secondary), var(--accent-primary));
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-md);
+.path-bar {
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  background: #ffffff;
+  border-bottom: 1px solid #e1e5e9;
 }
 
-.btn-secondary {
-  background: var(--bg-tertiary);
-  color: var(--text-secondary);
-  border: 1px solid var(--border-color);
+.path-label {
+  font-size: 13px;
+  color: #666666;
+  margin-right: 8px;
+  font-weight: 500;
 }
 
-.btn-secondary:hover {
-  background: var(--border-color);
-  color: var(--text-primary);
-  border-color: var(--accent-primary);
+.path-display {
+  flex: 1;
+  font-size: 13px;
+  color: #333333;
+  padding: 4px 8px;
+  background: #f5f5f5;
+  border: 1px solid #e1e5e9;
+  border-radius: 3px;
 }
 
-/* 主内容区 */
-.app-main {
+.current-path {
+  font-family: 'Consolas', 'Courier New', monospace;
+}
+
+.no-path {
+  color: #999999;
+  font-style: italic;
+}
+
+.sort-bar {
+  padding: 6px 16px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e1e5e9;
+}
+
+.sort-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sort-label {
+  font-size: 12px;
+  color: #666666;
+  font-weight: 500;
+}
+
+.sort-btn {
+  padding: 4px 8px;
+  background: #ffffff;
+  border: 1px solid #d1d9e0;
+  border-radius: 3px;
+  font-size: 11px;
+  color: #333333;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.sort-btn:hover {
+  background: #f5f5f5;
+  border-color: #2196f3;
+}
+
+.sort-btn.active {
+  background: #2196f3;
+  color: #ffffff;
+  border-color: #1976d2;
+}
+
+.explorer-main {
   flex: 1;
   display: flex;
   overflow: hidden;
 }
 
-/* 侧边栏 */
-.app-sidebar {
-  width: 260px;
-  background: var(--bg-secondary);
-  border-right: 1px solid var(--border-color);
+.folder-list-container {
+  flex: 1;
   display: flex;
   flex-direction: column;
+  background: #ffffff;
+  border-right: 1px solid #e1e5e9;
 }
 
-.sidebar-header {
-  padding: 12px 16px;
-  border-bottom: 1px solid #f1f5f9;
+.list-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-}
-
-.sidebar-header h2 {
-  margin: 0;
-  font-size: 14px;
+  padding: 8px 16px;
+  background: #f8f9fa;
+  border-bottom: 2px solid #2196f3;
+  font-size: 12px;
   font-weight: 600;
-  color: var(--text-primary);
-  letter-spacing: -0.025em;
+  color: #333333;
+  cursor: pointer;
+  user-select: none;
 }
 
-.folder-count {
-  background: var(--bg-tertiary);
-  color: var(--text-muted);
-  padding: 2px 6px;
-  border-radius: var(--radius-sm);
-  font-size: 10px;
-  font-weight: 600;
-  border: 1px solid var(--border-color);
+.list-header > div {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
-.sidebar-content {
+.list-header > div:hover {
+  background: #e3f2fd;
+}
+
+.col-name {
+  flex: 2;
+  min-width: 200px;
+}
+
+.col-time {
+  flex: 1;
+  min-width: 150px;
+}
+
+.col-count {
+  flex: 0 0 100px;
+  text-align: right;
+}
+
+.sort-indicator {
+  color: #2196f3;
+  font-weight: bold;
+}
+
+.folder-list {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .loading-state {
-  padding: 40px;
-  text-align: center;
-  color: #64748b;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  color: #666666;
 }
 
 .spinner {
-  width: 24px;
-  height: 24px;
-  border: 2px solid #e2e8f0;
-  border-top: 2px solid #4f46e5;
+  width: 32px;
+  height: 32px;
+  border: 3px solid #e1e5e9;
+  border-top: 3px solid #2196f3;
   border-radius: 50%;
   animation: spin 1s linear infinite;
-  margin: 0 auto 12px;
+  margin-bottom: 12px;
 }
 
 @keyframes spin {
@@ -797,623 +678,432 @@ export default {
 }
 
 .empty-state {
-  padding: 40px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  color: #666666;
   text-align: center;
-  color: #64748b;
 }
 
 .empty-icon {
   font-size: 48px;
   margin-bottom: 16px;
+  opacity: 0.6;
 }
 
 .empty-state h3 {
   margin: 0 0 8px 0;
-  color: #1e293b;
+  font-size: 16px;
+  font-weight: 500;
+  color: #333333;
 }
 
 .empty-state p {
   margin: 0;
-  font-size: 14px;
+  font-size: 13px;
+  color: #666666;
 }
 
-.folder-list {
-  padding: 8px 0;
-}
-
-.folder-item {
-  padding: 8px 16px;
-  cursor: pointer;
+.folder-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  border-left: 2px solid transparent;
-  border-radius: var(--radius-sm);
-  margin: 0 8px;
+  padding: 8px 16px;
+  border-bottom: 1px solid #f0f0f0;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  min-height: 40px;
 }
 
-.folder-item:hover {
-  background: var(--bg-tertiary);
-  transform: translateX(2px);
+.folder-row:hover {
+  background: #f5f5f5;
 }
 
-.folder-item.active {
-  background: rgba(0, 212, 255, 0.1);
-  border-left-color: var(--accent-primary);
-  box-shadow: inset 0 0 0 1px rgba(0, 212, 255, 0.2);
+.folder-row.selected {
+  background: #e3f2fd;
+  border-left: 3px solid #2196f3;
 }
 
 .folder-icon {
-  color: var(--accent-primary);
-  opacity: 0.8;
-  transition: all 0.2s;
-}
-
-.folder-item:hover .folder-icon {
-  opacity: 1;
-  transform: scale(1.1);
-}
-
-.folder-info {
-  flex: 1;
-  min-width: 0;
+  margin-right: 8px;
+  display: flex;
+  align-items: center;
 }
 
 .folder-name {
-  font-weight: 500;
-  color: var(--text-primary);
-  margin-bottom: 2px;
   font-size: 13px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.folder-meta {
-  display: flex;
-  gap: 8px;
-  font-size: 11px;
-  color: var(--text-muted);
-}
-
-.folder-arrow {
-  color: #cbd5e1;
-  opacity: 0;
-  transition: opacity 0.2s;
-}
-
-.folder-item:hover .folder-arrow {
-  opacity: 1;
-}
-
-/* 主内容区 */
-.app-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.preview-section {
-  flex: 1;
-  background: var(--bg-card);
-  backdrop-filter: blur(10px);
-  margin: 8px;
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-lg);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  border: 1px solid var(--border-color);
-}
-
-.preview-header {
-  padding: 12px 16px;
-  border-bottom: 1px solid #f1f5f9;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.preview-info h3 {
-  margin: 0 0 2px 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-primary);
-  letter-spacing: -0.025em;
-}
-
-.preview-info p {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: 12px;
-}
-
-.preview-controls {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.btn-icon {
-  width: 32px;
-  height: 32px;
-  border: 1px solid var(--border-color);
-  background: var(--bg-tertiary);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-secondary);
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.btn-icon:hover:not(:disabled) {
-  background: var(--accent-primary);
-  color: var(--bg-primary);
-  border-color: var(--accent-primary);
-  transform: translateY(-1px);
-}
-
-.btn-icon:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-  background: var(--bg-tertiary);
-}
-
-.image-counter {
-  font-size: 12px;
-  color: var(--text-muted);
-  min-width: 50px;
-  text-align: center;
+  color: #333333;
   font-weight: 500;
 }
 
-.preview-area {
-  flex: 1;
+.image-list-container {
+  flex: 2;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.image-list-header {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e1e5e9;
+}
+
+.image-list-header h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #333333;
+}
+
+.image-count {
+  font-size: 12px;
+  color: #666666;
+  background: #e1e5e9;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.image-list {
+  flex: 1;
+  overflow-y: auto;
   padding: 16px;
 }
 
-.image-preview {
-  max-width: 100%;
-  max-height: 100%;
-  text-align: center;
+.image-grid-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 16px;
 }
 
-.preview-image {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-lg);
-  cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  border: 1px solid var(--border-color);
-}
-
-.preview-image:hover {
-  transform: scale(1.02);
-  box-shadow: var(--shadow-lg), 0 0 0 2px var(--accent-primary);
-}
-
-.no-preview {
-  text-align: center;
-  color: var(--text-muted);
-}
-
-.no-preview-icon {
-  font-size: 48px;
-  margin-bottom: 12px;
-  opacity: 0.5;
-}
-
-.no-preview h3 {
-  margin: 0 0 6px 0;
-  color: var(--text-primary);
-  font-size: 14px;
-}
-
-.no-preview p {
-  margin: 0;
-  font-size: 12px;
-}
-
-/* 图片网格 */
-.image-grid-section {
-  background: var(--bg-card);
-  backdrop-filter: blur(10px);
-  margin: 0 8px 8px;
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-lg);
-  max-height: 160px;
-  display: flex;
-  flex-direction: column;
-  border: 1px solid var(--border-color);
-}
-
-.grid-header {
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--border-color);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.grid-header h4 {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-primary);
-  letter-spacing: -0.025em;
-}
-
-.grid-info {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
-.btn-load-more {
-  padding: 2px 8px;
-  background: #4f46e5;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  font-size: 10px;
-  cursor: pointer;
-}
-
-.btn-load-more:hover {
-  background: #4338ca;
-}
-
-.image-grid {
-  flex: 1;
-  overflow-x: auto;
-  padding: 12px 16px;
-  display: flex;
-  gap: 8px;
-}
-
-.image-thumbnail {
-  flex: 0 0 auto;
-  width: 70px;
-  cursor: pointer;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
+.image-item {
+  background: #ffffff;
+  border: 1px solid #e1e5e9;
+  border-radius: 6px;
   overflow: hidden;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  background: var(--bg-tertiary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
-.image-thumbnail:hover {
-  border-color: var(--accent-primary);
+.image-item:hover {
   transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border-color: #2196f3;
 }
 
-.image-thumbnail.selected {
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.2);
+.image-thumb {
+  aspect-ratio: 1;
+  overflow: hidden;
+  background: #f5f5f5;
 }
 
-.image-thumbnail img {
+.image-thumb img {
   width: 100%;
-  height: 50px;
+  height: 100%;
   object-fit: cover;
-  background: var(--bg-tertiary);
-  transition: all 0.2s;
+  transition: transform 0.3s ease;
 }
 
-.image-thumbnail img[src] {
-  opacity: 1;
+.image-item:hover .image-thumb img {
+  transform: scale(1.05);
 }
 
-.image-thumbnail img:not([src]) {
-  opacity: 0.3;
+.image-info {
+  padding: 8px 12px;
 }
 
 .image-name {
-  padding: 2px;
-  font-size: 10px;
-  text-align: center;
-  color: #64748b;
+  font-size: 12px;
+  font-weight: 500;
+  color: #333333;
+  margin-bottom: 4px;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-.load-more-card {
-  flex: 0 0 auto;
-  width: 70px;
-  height: 70px;
-  background: #f8fafc;
-  border: 1px dashed #cbd5e1;
-  border-radius: 6px;
+.image-meta {
+  font-size: 11px;
+  color: #666666;
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s;
+  z-index: 1000;
+  animation: fadeIn 0.2s ease;
 }
 
-.load-more-card:hover {
-  background: #f1f5f9;
-  border-color: #94a3b8;
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
-.load-more-icon {
-  font-size: 16px;
-  color: #4f46e5;
-  font-weight: bold;
+.modal-content {
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  width: 600px;
+  max-width: 90vw;
+  max-height: 80vh;
+  overflow: hidden;
+  animation: slideIn 0.3s ease;
 }
 
-.load-more-text {
-  font-size: 10px;
-  color: #64748b;
-  text-align: center;
-  margin-top: 2px;
-}
-
-.remaining-count {
-  font-size: 9px;
-  color: #94a3b8;
-  margin-top: 1px;
-}
-
-/* 响应式设计 */
-@media (max-width: 768px) {
-  .app-header {
-    padding: 0 16px;
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
   }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
 
-  .app-main {
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e1e5e9;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333333;
+}
+
+.btn-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: #666666;
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+.btn-close:hover {
+  background: #e1e5e9;
+  color: #333333;
+}
+
+.modal-body {
+  padding: 20px;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+.empty-paths {
+  text-align: center;
+  padding: 40px 20px;
+  color: #666666;
+}
+
+.path-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.path-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  background: #f8f9fa;
+  border: 1px solid #e1e5e9;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+
+.path-item:hover {
+  background: #f0f0f0;
+  border-color: #d1d9e0;
+}
+
+.path-info {
+  flex: 1;
+  margin-right: 12px;
+}
+
+.path-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #333333;
+  margin-bottom: 4px;
+}
+
+.path-full {
+  font-size: 12px;
+  color: #666666;
+  font-family: 'Consolas', 'Courier New', monospace;
+  margin-bottom: 6px;
+}
+
+.path-stats {
+  display: flex;
+  gap: 8px;
+}
+
+.stat-badge {
+  font-size: 11px;
+  color: #666666;
+  background: #e1e5e9;
+  padding: 2px 6px;
+  border-radius: 10px;
+}
+
+.btn-remove {
+  background: none;
+  border: none;
+  color: #dc3545;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-remove:hover {
+  background: #ffe6e6;
+  color: #c82333;
+}
+
+.modal-footer {
+  padding: 16px 20px;
+  background: #f8f9fa;
+  border-top: 1px solid #e1e5e9;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.btn {
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: 1px solid transparent;
+}
+
+.btn-secondary {
+  background: #ffffff;
+  border-color: #d1d9e0;
+  color: #333333;
+}
+
+.btn-secondary:hover {
+  background: #f5f5f5;
+  border-color: #b0b0b0;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+@media (max-width: 768px) {
+  .explorer-main {
     flex-direction: column;
   }
 
-  .app-sidebar {
-    width: 100%;
-    height: 200px;
+  .folder-list-container {
+    border-right: none;
+    border-bottom: 1px solid #e1e5e9;
   }
 
-  .app-content {
-    flex: 1;
-  }
-
-  .preview-section {
-    margin: 8px;
-  }
-
-  .image-grid-section {
-    margin: 0 8px 8px;
-  }
-
-  /* 加载文本 */
-  .loading-text {
-    color: #4f46e5;
-    font-size: 14px;
-    font-weight: 500;
-  }
-
-  /* 模态框样式 */
-  .modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
+  .image-grid-list {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 12px;
   }
 
   .modal-content {
-    background: var(--bg-secondary);
-    border-radius: var(--radius-lg);
-    width: 500px;
-    max-width: 90vw;
-    max-height: 80vh;
-    display: flex;
-    flex-direction: column;
-    box-shadow: var(--shadow-lg);
-    border: 1px solid var(--border-color);
+    width: 95vw;
+    margin: 10px;
   }
 
-  .modal-header {
-    padding: 20px 24px;
-    border-bottom: 1px solid #f1f5f9;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+  .list-header {
+    padding: 8px 12px;
   }
 
-  .modal-header h3 {
-    margin: 0;
-    font-size: 18px;
-    font-weight: 600;
-    color: var(--text-primary);
-    letter-spacing: -0.025em;
+  .folder-row {
+    padding: 8px 12px;
   }
 
-  .btn-close {
-    background: none;
-    border: none;
-    font-size: 24px;
-    color: #64748b;
-    cursor: pointer;
-    padding: 4px;
-    width: 32px;
-    height: 32px;
-    border-radius: 6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+  .col-name {
+    min-width: 150px;
   }
 
-  .btn-close:hover {
-    background: #f1f5f9;
-    color: #1e293b;
+  .col-time {
+    min-width: 120px;
+  }
+}
+
+@media (max-width: 480px) {
+  .header-toolbar {
+    padding: 8px 12px;
+    gap: 6px;
   }
 
-  .modal-body {
-    padding: 20px 24px;
-    flex: 1;
-    overflow-y: auto;
-  }
-
-  .empty-paths {
-    text-align: center;
-    color: #64748b;
-    padding: 40px 0;
-  }
-
-  .empty-paths .empty-icon {
-    font-size: 48px;
-    margin-bottom: 16px;
-  }
-
-  .path-list {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .path-item {
-    display: flex;
-    align-items: flex-start;
-    padding: 16px;
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    background: var(--bg-tertiary);
-  }
-
-  .path-info {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .path-name {
-    font-weight: 500;
-    color: #1e293b;
-    margin-bottom: 4px;
-  }
-
-  .path-full {
-    font-size: 12px;
-    color: #64748b;
-    margin-bottom: 8px;
-    word-break: break-all;
-  }
-
-  .path-stats {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-  }
-
-  .stat-badge {
-    background: #e0e7ff;
-    color: #3730a3;
-    padding: 2px 8px;
-    border-radius: 12px;
+  .toolbar-btn {
+    padding: 4px 8px;
     font-size: 11px;
-    font-weight: 500;
   }
 
-  .btn-remove {
-    background: #fef2f2;
-    border: 1px solid #fecaca;
-    color: #dc2626;
-    padding: 8px;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.2s;
+  .path-bar {
+    padding: 6px 12px;
   }
 
-  .btn-remove:hover {
-    background: #fee2e2;
+  .sort-bar {
+    padding: 6px 12px;
   }
 
-  .modal-footer {
-    padding: 16px 24px;
-    border-top: 1px solid #f1f5f9;
-    display: flex;
-    justify-content: flex-end;
-  }
-
-  /* 背景设置样式 */
-  .background-controls {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-  }
-
-  .control-group {
-    display: flex;
-    flex-direction: column;
+  .image-grid-list {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
     gap: 8px;
   }
 
-  .control-group label {
-    font-weight: 500;
-    color: #1e293b;
-    font-size: 14px;
+  .col-time {
+    display: none;
   }
-
-  .control-group input[type="range"] {
-    width: 100%;
-    height: 6px;
-    background: #e2e8f0;
-    border-radius: 3px;
-    outline: none;
-  }
-
-  .opacity-value {
-    font-size: 12px;
-    color: #64748b;
-    text-align: right;
-  }
-
-  .current-background {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 12px;
-    background: #f8fafc;
-    border-radius: 8px;
-    border: 1px solid #e2e8f0;
-  }
-
-  .background-preview {
-    width: 60px;
-    height: 40px;
-    object-fit: cover;
-    border-radius: 4px;
-    border: 1px solid #e2e8f0;
-  }
-
-  .btn-remove-background {
-    padding: 6px 12px;
-    background: #fef2f2;
-    color: #dc2626;
-    border: 1px solid #fecaca;
-    border-radius: 6px;
-    font-size: 12px;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-
-  .btn-remove-background:hover {
-    background: #fee2e2;
-  }
-}</style>
+}
+</style>
