@@ -146,10 +146,7 @@
           <div class="grid-header">
             <h4>图片缩略图</h4>
             <div class="grid-info">
-              显示 {{ currentImages.length }} / {{ allImages.length }} 张
-              <button v-if="hasMoreImages" @click="loadMoreImages" class="btn-load-more">
-                {{ loadingImages ? '加载中...' : '加载更多' }}
-              </button>
+              共 {{ allImages.length }} 张图片
             </div>
           </div>
 
@@ -165,16 +162,6 @@
               <div class="image-name">{{ image.name }}</div>
             </div>
 
-            <!-- 加载更多按钮 -->
-            <div v-if="hasMoreImages" @click="loadMoreImages" class="load-more-card">
-              <div class="load-more-icon">+</div>
-              <div class="load-more-text">
-                {{ loadingImages ? '加载中...' : '加载更多图片' }}
-              </div>
-              <div class="remaining-count">
-                还有 {{ allImages.length - currentImages.length }} 张
-              </div>
-            </div>
           </div>
         </div>
       </section>
@@ -280,13 +267,14 @@ export default {
       loading: false,
       loadingImages: false,
       currentPage: 0,
-      pageSize: 5,
+      pageSize: 20,
       hasMoreImages: false,
       configLoaded: false,
       showPathManager: false,
       showBackgroundManager: false,
       backgroundImage: null, // 背景图片
-      backgroundOpacity: 0.3 // 背景图片透明度
+      backgroundOpacity: 0.3, // 背景图片透明度
+      loadedImages: new Set() // 跟踪已加载的图片
     }
   },
   computed: {
@@ -471,6 +459,7 @@ export default {
         this.selectedImage = null
         this.allImages = []
         this.currentImages = []
+        this.loadedImages.clear()
         this.currentPage = 0
         this.hasMoreImages = false
 
@@ -479,10 +468,13 @@ export default {
           const images = await window.electronAPI.getImagesInFolder(folder.path)
           this.allImages = images || []
 
-          this.loadNextPage()
+          // 一次性加载所有缩略图
+          this.loadAllThumbnails()
 
           if (this.currentImages.length > 0) {
             this.selectedImage = this.currentImages[0]
+            // 预加载第一张图片
+            this.loadImageLazy(this.currentImages[0])
           }
         }
       } catch (error) {
@@ -495,12 +487,25 @@ export default {
 
     selectImage(image) {
       this.selectedImage = image
+      // 懒加载选中的图片
+      this.loadImageLazy(image)
+
+      // 预加载相邻的图片
+      const currentIndex = this.allImages.findIndex(img => img.path === image.path)
+      if (currentIndex > 0) {
+        this.loadImageLazy(this.allImages[currentIndex - 1])
+      }
+      if (currentIndex < this.allImages.length - 1) {
+        this.loadImageLazy(this.allImages[currentIndex + 1])
+      }
     },
 
     previousImage() {
       if (this.hasPrevious) {
         const prevIndex = this.currentImageIndex - 1
         this.selectedImage = this.currentImages[prevIndex]
+        // 懒加载上一张图片
+        this.loadImageLazy(this.selectedImage)
       }
     },
 
@@ -508,31 +513,30 @@ export default {
       if (this.hasNext) {
         const nextIndex = this.currentImageIndex + 1
         this.selectedImage = this.currentImages[nextIndex]
+        // 懒加载下一张图片
+        this.loadImageLazy(this.selectedImage)
       }
     },
 
-    loadNextPage() {
-      const startIndex = this.currentPage * this.pageSize
-      const endIndex = startIndex + this.pageSize
-      const nextImages = this.allImages.slice(startIndex, endIndex)
+    loadAllThumbnails() {
+      // 一次性加载所有缩略图
+      this.currentImages = [...this.allImages]
+      this.hasMoreImages = false
+      this.currentPage = 1
+    },
 
-      if (nextImages.length > 0) {
-        this.currentImages = nextImages
-        this.currentPage++
-        this.hasMoreImages = endIndex < this.allImages.length
-      } else {
-        this.hasMoreImages = false
+    loadImageLazy(image) {
+      // 懒加载单张图片
+      if (image && !this.loadedImages.has(image.path)) {
+        this.loadedImages.add(image.path)
+        const img = new Image()
+        img.src = this.getImageUrl(image.path)
       }
     },
 
     loadMoreImages() {
-      if (this.hasMoreImages && !this.loadingImages) {
-        this.loadingImages = true
-        setTimeout(() => {
-          this.loadNextPage()
-          this.loadingImages = false
-        }, 100)
-      }
+      // 保留这个方法来保持兼容性
+      return
     },
 
     getImageUrl(imagePath) {
@@ -608,12 +612,12 @@ export default {
 
 /* 顶部导航 */
 .app-header {
-  height: 64px;
+  height: 48px;
   background: white;
   border-bottom: 1px solid #e2e8f0;
   display: flex;
   align-items: center;
-  padding: 0 24px;
+  padding: 0 16px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
@@ -624,12 +628,12 @@ export default {
 .app-logo {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
 }
 
 .app-title {
   margin: 0;
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 600;
   color: #1e293b;
 }
@@ -642,33 +646,33 @@ export default {
 
 .stats-info {
   display: flex;
-  gap: 24px;
+  gap: 16px;
 }
 
 .stats-item {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   color: #64748b;
-  font-size: 14px;
+  font-size: 12px;
 }
 
 .header-right {
   flex: 0 0 auto;
   display: flex;
-  gap: 12px;
+  gap: 8px;
 }
 
 .btn {
-  padding: 8px 16px;
+  padding: 6px 12px;
   border: none;
-  border-radius: 8px;
-  font-size: 14px;
+  border-radius: 6px;
+  font-size: 12px;
   font-weight: 500;
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   transition: all 0.2s;
 }
 
@@ -700,7 +704,7 @@ export default {
 
 /* 侧边栏 */
 .app-sidebar {
-  width: 320px;
+  width: 280px;
   background: white;
   border-right: 1px solid #e2e8f0;
   display: flex;
@@ -708,7 +712,7 @@ export default {
 }
 
 .sidebar-header {
-  padding: 20px 24px;
+  padding: 12px 16px;
   border-bottom: 1px solid #f1f5f9;
   display: flex;
   align-items: center;
@@ -717,7 +721,7 @@ export default {
 
 .sidebar-header h2 {
   margin: 0;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
   color: #1e293b;
 }
@@ -725,9 +729,9 @@ export default {
 .folder-count {
   background: #f1f5f9;
   color: #64748b;
-  padding: 2px 8px;
-  border-radius: 12px;
-  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 8px;
+  font-size: 10px;
   font-weight: 500;
 }
 
@@ -783,13 +787,13 @@ export default {
 }
 
 .folder-item {
-  padding: 16px 24px;
+  padding: 8px 16px;
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   transition: all 0.2s;
-  border-left: 3px solid transparent;
+  border-left: 2px solid transparent;
 }
 
 .folder-item:hover {
@@ -814,7 +818,8 @@ export default {
 .folder-name {
   font-weight: 500;
   color: #1e293b;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
+  font-size: 13px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -822,8 +827,8 @@ export default {
 
 .folder-meta {
   display: flex;
-  gap: 12px;
-  font-size: 12px;
+  gap: 8px;
+  font-size: 11px;
   color: #64748b;
 }
 
@@ -848,8 +853,8 @@ export default {
 .preview-section {
   flex: 1;
   background: white;
-  margin: 16px;
-  border-radius: 12px;
+  margin: 8px;
+  border-radius: 8px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   display: flex;
   flex-direction: column;
@@ -857,7 +862,7 @@ export default {
 }
 
 .preview-header {
-  padding: 20px 24px;
+  padding: 12px 16px;
   border-bottom: 1px solid #f1f5f9;
   display: flex;
   justify-content: space-between;
@@ -865,8 +870,8 @@ export default {
 }
 
 .preview-info h3 {
-  margin: 0 0 4px 0;
-  font-size: 18px;
+  margin: 0 0 2px 0;
+  font-size: 16px;
   font-weight: 600;
   color: #1e293b;
 }
@@ -874,21 +879,21 @@ export default {
 .preview-info p {
   margin: 0;
   color: #64748b;
-  font-size: 14px;
+  font-size: 12px;
 }
 
 .preview-controls {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
 }
 
 .btn-icon {
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   border: 1px solid #e2e8f0;
   background: white;
-  border-radius: 8px;
+  border-radius: 6px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -908,9 +913,9 @@ export default {
 }
 
 .image-counter {
-  font-size: 14px;
+  font-size: 12px;
   color: #64748b;
-  min-width: 60px;
+  min-width: 50px;
   text-align: center;
 }
 
@@ -919,7 +924,7 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: 16px;
 }
 
 .image-preview {
@@ -932,8 +937,8 @@ export default {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
-  border-radius: 8px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  border-radius: 6px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   cursor: pointer;
   transition: transform 0.2s;
 }
@@ -948,33 +953,34 @@ export default {
 }
 
 .no-preview-icon {
-  font-size: 64px;
-  margin-bottom: 16px;
+  font-size: 48px;
+  margin-bottom: 12px;
 }
 
 .no-preview h3 {
-  margin: 0 0 8px 0;
+  margin: 0 0 6px 0;
   color: #1e293b;
+  font-size: 14px;
 }
 
 .no-preview p {
   margin: 0;
-  font-size: 14px;
+  font-size: 12px;
 }
 
 /* 图片网格 */
 .image-grid-section {
   background: white;
-  margin: 0 16px 16px;
-  border-radius: 12px;
+  margin: 0 8px 8px;
+  border-radius: 8px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  max-height: 200px;
+  max-height: 160px;
   display: flex;
   flex-direction: column;
 }
 
 .grid-header {
-  padding: 16px 24px;
+  padding: 12px 16px;
   border-bottom: 1px solid #f1f5f9;
   display: flex;
   justify-content: space-between;
@@ -983,7 +989,7 @@ export default {
 
 .grid-header h4 {
   margin: 0;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
   color: #1e293b;
 }
@@ -991,18 +997,18 @@ export default {
 .grid-info {
   display: flex;
   align-items: center;
-  gap: 12px;
-  font-size: 14px;
+  gap: 8px;
+  font-size: 12px;
   color: #64748b;
 }
 
 .btn-load-more {
-  padding: 4px 12px;
+  padding: 2px 8px;
   background: #4f46e5;
   color: white;
   border: none;
-  border-radius: 6px;
-  font-size: 12px;
+  border-radius: 4px;
+  font-size: 10px;
   cursor: pointer;
 }
 
@@ -1013,17 +1019,17 @@ export default {
 .image-grid {
   flex: 1;
   overflow-x: auto;
-  padding: 16px 24px;
+  padding: 12px 16px;
   display: flex;
-  gap: 12px;
+  gap: 8px;
 }
 
 .image-thumbnail {
   flex: 0 0 auto;
-  width: 80px;
+  width: 70px;
   cursor: pointer;
-  border: 2px solid transparent;
-  border-radius: 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
   overflow: hidden;
   transition: all 0.2s;
 }
@@ -1038,13 +1044,23 @@ export default {
 
 .image-thumbnail img {
   width: 100%;
-  height: 60px;
+  height: 50px;
   object-fit: cover;
+  background: #f1f5f9;
+  transition: opacity 0.2s;
+}
+
+.image-thumbnail img[src] {
+  opacity: 1;
+}
+
+.image-thumbnail img:not([src]) {
+  opacity: 0.5;
 }
 
 .image-name {
-  padding: 4px;
-  font-size: 11px;
+  padding: 2px;
+  font-size: 10px;
   text-align: center;
   color: #64748b;
   overflow: hidden;
@@ -1054,11 +1070,11 @@ export default {
 
 .load-more-card {
   flex: 0 0 auto;
-  width: 80px;
-  height: 80px;
+  width: 70px;
+  height: 70px;
   background: #f8fafc;
-  border: 2px dashed #cbd5e1;
-  border-radius: 8px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 6px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1073,22 +1089,22 @@ export default {
 }
 
 .load-more-icon {
-  font-size: 20px;
+  font-size: 16px;
   color: #4f46e5;
   font-weight: bold;
 }
 
 .load-more-text {
-  font-size: 11px;
+  font-size: 10px;
   color: #64748b;
   text-align: center;
-  margin-top: 4px;
+  margin-top: 2px;
 }
 
 .remaining-count {
-  font-size: 10px;
+  font-size: 9px;
   color: #94a3b8;
-  margin-top: 2px;
+  margin-top: 1px;
 }
 
 /* 响应式设计 */
