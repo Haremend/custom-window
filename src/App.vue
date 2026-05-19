@@ -29,7 +29,7 @@
     <!-- 主要内容区域 -->
     <main class="explorer-main">
       <!-- 文件夹列表 -->
-      <div class="folder-list-container">
+      <div class="folder-list-container" v-if="showFolderList">
         <div class="list-header">
           <div class="col-name" @click="setSortBy('name')">
             名称
@@ -89,7 +89,15 @@
       <!-- 图片列表视图 -->
       <div class="image-list-container" v-if="selectedFolder">
         <div class="image-list-header">
-          <h3>{{ selectedFolder.name }} - 图片列表</h3>
+          <div class="header-left">
+            <button @click="goBackToFolders" class="back-btn">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M10 12l-4-4 4-4" stroke="currentColor" stroke-width="2" fill="none"/>
+              </svg>
+              返回上级
+            </button>
+            <h3>{{ selectedFolder.name }} - 图片列表</h3>
+          </div>
           <div class="image-count">{{ allImages.length }} 张图片</div>
         </div>
 
@@ -186,7 +194,8 @@ export default {
       sortBy: 'count',
       sortOrder: 'desc',
       currentPath: '',
-      loadedImages: new Set()
+      loadedImages: new Set(),
+      showFolderList: true
     }
   },
   computed: {
@@ -332,6 +341,7 @@ export default {
         this.selectedFolder = folder
         this.allImages = []
         this.loadedImages.clear()
+        this.showFolderList = false
 
         if (window.electronAPI) {
           this.loadingImages = true
@@ -344,6 +354,12 @@ export default {
       } finally {
         this.loadingImages = false
       }
+    },
+
+    goBackToFolders() {
+      this.showFolderList = true
+      this.selectedFolder = null
+      this.allImages = []
     },
 
     setSortBy(sortType) {
@@ -685,6 +701,32 @@ export default {
   padding: 12px 16px;
   background: #f8f9fa;
   border-bottom: 1px solid #e1e5e9;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.back-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: #ffffff;
+  border: 1px solid #d1d9e0;
+  border-radius: 3px;
+  font-size: 12px;
+  color: #333333;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.back-btn:hover {
+  background: #e3f2fd;
+  border-color: #2196f3;
+  color: #2196f3;
 }
 
 .image-list-header h3 {
