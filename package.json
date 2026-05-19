@@ -1,0 +1,25 @@
+{
+  "name": "desktop-image-tool",
+  "version": "1.0.0",
+  "description": "Node.js desktop image management tool with folder sorting by file count",
+  "main": "electron-main/main.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "electron": "electron electron-main/main.js",
+    "start": "npm run build && npm run electron"
+  },
+  "keywords": ["electron", "vue", "image-tool", "desktop"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "vue": "^3.4.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.0.0",
+    "vite": "^5.0.0",
+    "electron": "^28.0.0",
+    "concurrently": "^8.2.0"
+  }
+}
