@@ -15,6 +15,10 @@
           <i class="icon-settings"></i>
           管理路径
         </button>
+        <button @click="showLogViewer = true" class="toolbar-btn">
+          <i class="icon-document"></i>
+          查看日志
+        </button>
 
         <div class="path-section">
           <span class="path-label">当前路径:</span>
@@ -176,11 +180,30 @@
         </div>
       </div>
     </div>
+
+    <!-- 日志查看对话框 -->
+    <div v-if="showLogViewer" class="modal-overlay" @click="showLogViewer = false">
+      <div class="modal-content modal-large" @click.stop>
+        <div class="modal-header">
+          <h3>系统日志</h3>
+          <button @click="showLogViewer = false" class="btn-close">×</button>
+        </div>
+        <div class="modal-body" style="padding: 0; height: 70vh;">
+          <LogViewer />
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script>
+import logger from './utils/logger'
+import LogViewer from './components/LogViewer.vue'
+
 export default {
+  components: {
+    LogViewer
+  },
   data() {
     return {
       watchedPaths: [],
@@ -195,7 +218,8 @@ export default {
       sortOrder: 'desc',
       currentPath: '',
       loadedImages: new Set(),
-      showFolderList: true
+      showFolderList: true,
+      showLogViewer: false
     }
   },
   computed: {
@@ -231,24 +255,36 @@ export default {
   },
   methods: {
     async addPath() {
+      logger.info('开始添加路径')
       try {
         if (window.electronAPI) {
+          logger.debug('调用Electron选择文件夹对话框')
           const folderPath = await window.electronAPI.selectFolder()
+
           if (folderPath) {
+            logger.info('用户选择了文件夹:', folderPath)
+
             if (!this.watchedPaths.includes(folderPath)) {
               this.watchedPaths.push(folderPath)
               this.currentPath = folderPath
+              logger.debug('开始刷新文件夹统计信息')
               await this.refreshFolderStats(folderPath)
+              logger.debug('开始保存配置')
               await this.saveConfig()
+              logger.info('路径添加成功:', folderPath)
             } else {
+              logger.warn('路径已存在:', folderPath)
               alert('该路径已存在')
             }
+          } else {
+            logger.info('用户取消了文件夹选择')
           }
         } else {
+          logger.error('Electron API不可用')
           alert('Electron API not available')
         }
       } catch (error) {
-        console.error('Error adding path:', error)
+        logger.error('添加路径失败:', error)
         alert('添加路径失败: ' + error.message)
       }
     },
@@ -337,6 +373,7 @@ export default {
     },
 
     async selectFolder(folder) {
+      logger.info('选择文件夹:', folder.name, folder.path)
       try {
         this.selectedFolder = folder
         this.allImages = []
@@ -344,12 +381,26 @@ export default {
         this.showFolderList = false
 
         if (window.electronAPI) {
+          logger.debug('开始加载文件夹中的图片')
           this.loadingImages = true
+
+          const startTime = Date.now()
           const images = await window.electronAPI.getImagesInFolder(folder.path)
+          const loadTime = Date.now() - startTime
+
           this.allImages = images || []
+
+          logger.info(`图片加载完成: 共${images.length}张图片, 耗时${loadTime}ms`)
+          logger.debug('图片列表:', images)
+
+          if (images.length === 0) {
+            logger.warn('文件夹中没有找到图片文件:', folder.path)
+          }
+        } else {
+          logger.error('Electron API不可用，无法加载图片')
         }
       } catch (error) {
-        console.error('Error selecting folder:', error)
+        logger.error('选择文件夹失败:', error, { folder: folder.path })
         alert('加载文件夹失败: ' + error.message)
       } finally {
         this.loadingImages = false
@@ -376,11 +427,19 @@ export default {
     },
 
     getImageUrl(imagePath) {
-      if (!imagePath) return ''
+      if (!imagePath) {
+        logger.warn('尝试获取空路径的图片URL')
+        return ''
+      }
+
       if (window.electronAPI) {
         const cleanPath = imagePath.replace(/\\/g, '/')
-        return `local:///${cleanPath}`
+        const url = `local:///${cleanPath}`
+        logger.debug('生成图片URL:', { original: imagePath, clean: cleanPath, url })
+        return url
       }
+
+      logger.debug('使用原始路径作为URL (非Electron环境):', imagePath)
       return imagePath
     },
 
@@ -452,8 +511,15 @@ export default {
     }
   },
   async mounted() {
-    console.log('App mounted, Electron API available:', !!window.electronAPI)
-    await this.loadConfig()
+    logger.info('App组件挂载开始')
+    logger.info('Electron API可用:', !!window.electronAPI)
+
+    try {
+      await this.loadConfig()
+      logger.info('配置加载完成')
+    } catch (error) {
+      logger.error('配置加载失败:', error)
+    }
   }
 }
 </script>
@@ -836,6 +902,12 @@ export default {
   max-height: 80vh;
   overflow: hidden;
   animation: slideIn 0.3s ease;
+}
+
+.modal-large {
+  width: 90vw;
+  max-width: 1200px;
+  height: 85vh;
 }
 
 @keyframes slideIn {

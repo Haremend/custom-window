@@ -1,8 +1,12 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron'
 import path from 'path'
 import fs from 'fs/promises'
+import { app as electronApp } from 'electron'
 
 const __dirname = path.resolve()
+
+// 日志文件路径
+const LOG_FILE_PATH = path.join(electronApp.getPath('userData'), 'image-manager-logs.json')
 
 // 图片文件扩展名
 const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg']
@@ -114,6 +118,56 @@ ipcMain.handle('get-images-in-folder', async (_, folderPath: string) => {
   } catch (error) {
     console.error('Error getting images in folder:', error)
     return []
+  }
+})
+
+// 日志文件操作
+ipcMain.handle('read-log-file', async () => {
+  try {
+    const data = await fs.readFile(LOG_FILE_PATH, 'utf8')
+    return data
+  } catch (error) {
+    // 文件不存在时返回null
+    if (error.code === 'ENOENT') {
+      return null
+    }
+    console.error('读取日志文件失败:', error)
+    throw error
+  }
+})
+
+ipcMain.handle('write-log-file', async (_, logData: string) => {
+  try {
+    await fs.writeFile(LOG_FILE_PATH, logData, 'utf8')
+  } catch (error) {
+    console.error('写入日志文件失败:', error)
+    throw error
+  }
+})
+
+// 配置持久化文件路径
+const CONFIG_FILE_PATH = path.join(electronApp.getPath('userData'), 'config.json')
+
+ipcMain.handle('load-config', async () => {
+  try {
+    const data = await fs.readFile(CONFIG_FILE_PATH, 'utf8')
+    return JSON.parse(data)
+  } catch (error) {
+    // 文件不存在时返回null
+    if (error.code === 'ENOENT') {
+      return null
+    }
+    console.error('加载配置失败:', error)
+    return null
+  }
+})
+
+ipcMain.handle('save-config', async (_, config: any) => {
+  try {
+    await fs.writeFile(CONFIG_FILE_PATH, JSON.stringify(config, null, 2), 'utf8')
+  } catch (error) {
+    console.error('保存配置失败:', error)
+    throw error
   }
 })
 
