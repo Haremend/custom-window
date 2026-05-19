@@ -15,45 +15,13 @@
           <i class="icon-settings"></i>
           管理路径
         </button>
-      </div>
 
-      <!-- 路径显示栏 -->
-      <div class="path-bar">
-        <div class="path-label">当前路径:</div>
-        <div class="path-display">
-          <span v-if="currentPath" class="current-path">{{ currentPath }}</span>
-          <span v-else class="no-path">请选择或添加路径</span>
-        </div>
-      </div>
-
-      <!-- 排序控制栏 -->
-      <div class="sort-bar" v-if="sortedFolders.length > 0">
-        <div class="sort-controls">
-          <span class="sort-label">排序方式:</span>
-          <button
-            @click="setSortBy('name')"
-            :class="['sort-btn', { active: sortBy === 'name' }]"
-          >
-            名称
-          </button>
-          <button
-            @click="setSortBy('time')"
-            :class="['sort-btn', { active: sortBy === 'time' }]"
-          >
-            修改时间
-          </button>
-          <button
-            @click="setSortBy('count')"
-            :class="['sort-btn', { active: sortBy === 'count' }]"
-          >
-            文件数量
-          </button>
-          <button
-            @click="toggleSortOrder"
-            :class="['sort-btn', { active: sortOrder === 'desc' }]"
-          >
-            {{ sortOrder === 'asc' ? '↑' : '↓' }}
-          </button>
+        <div class="path-section">
+          <span class="path-label">当前路径:</span>
+          <div class="path-display">
+            <span v-if="currentPath" class="current-path">{{ currentPath }}</span>
+            <span v-else class="no-path">请选择或添加路径</span>
+          </div>
         </div>
       </div>
     </header>
@@ -492,9 +460,11 @@ export default {
 
 .header-toolbar {
   display: flex;
-  gap: 8px;
+  align-items: center;
+  gap: 12px;
   padding: 8px 16px;
   border-bottom: 1px solid #e1e5e9;
+  flex-wrap: wrap;
 }
 
 .toolbar-btn {
@@ -516,29 +486,32 @@ export default {
   border-color: #2196f3;
 }
 
-.path-bar {
+.path-section {
   display: flex;
   align-items: center;
-  padding: 8px 16px;
-  background: #ffffff;
-  border-bottom: 1px solid #e1e5e9;
+  gap: 8px;
+  margin-left: auto;
+  padding-left: 16px;
 }
 
 .path-label {
   font-size: 13px;
   color: #666666;
-  margin-right: 8px;
   font-weight: 500;
+  white-space: nowrap;
 }
 
 .path-display {
-  flex: 1;
   font-size: 13px;
   color: #333333;
   padding: 4px 8px;
   background: #f5f5f5;
   border: 1px solid #e1e5e9;
   border-radius: 3px;
+  max-width: 400px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .current-path {
@@ -548,46 +521,6 @@ export default {
 .no-path {
   color: #999999;
   font-style: italic;
-}
-
-.sort-bar {
-  padding: 6px 16px;
-  background: #f8f9fa;
-  border-bottom: 1px solid #e1e5e9;
-}
-
-.sort-controls {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.sort-label {
-  font-size: 12px;
-  color: #666666;
-  font-weight: 500;
-}
-
-.sort-btn {
-  padding: 4px 8px;
-  background: #ffffff;
-  border: 1px solid #d1d9e0;
-  border-radius: 3px;
-  font-size: 11px;
-  color: #333333;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.sort-btn:hover {
-  background: #f5f5f5;
-  border-color: #2196f3;
-}
-
-.sort-btn.active {
-  background: #2196f3;
-  color: #ffffff;
-  border-color: #1976d2;
 }
 
 .explorer-main {
