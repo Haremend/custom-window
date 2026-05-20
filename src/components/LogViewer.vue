@@ -1,10 +1,10 @@
 <template>
   <div class="log-viewer">
     <div class="log-header">
-      <h3>系统日志</h3>
+      <h3>System Logs</h3>
       <div class="log-controls">
         <select v-model="selectedLevel" @change="filterLogs">
-          <option value="">所有级别</option>
+          <option value="">All Levels</option>
           <option value="DEBUG">DEBUG</option>
           <option value="INFO">INFO</option>
           <option value="WARN">WARN</option>
@@ -14,20 +14,20 @@
         <input
           v-model="searchKeyword"
           type="text"
-          placeholder="搜索日志..."
+          placeholder="Search logs..."
           @input="searchLogs"
           class="search-input"
         />
 
-        <button @click="exportLogs" class="btn btn-secondary">导出日志</button>
-        <button @click="clearLogs" class="btn btn-danger">清空日志</button>
-        <button @click="refreshLogs" class="btn btn-primary">刷新</button>
+        <button @click="exportLogs" class="btn btn-secondary">Export Logs</button>
+        <button @click="clearLogs" class="btn btn-danger">Clear Logs</button>
+        <button @click="refreshLogs" class="btn btn-primary">Refresh</button>
       </div>
     </div>
 
     <div class="log-stats">
       <div class="stat-item">
-        <span class="stat-label">总计:</span>
+        <span class="stat-label">Total:</span>
         <span class="stat-value">{{ stats.total }}</span>
       </div>
       <div class="stat-item">
@@ -51,13 +51,13 @@
     <div class="log-content">
       <div v-if="loading" class="loading-state">
         <div class="spinner"></div>
-        <span>加载日志中...</span>
+        <span>Loading logs...</span>
       </div>
 
       <div v-else-if="filteredLogs.length === 0" class="empty-state">
         <div class="empty-icon">📝</div>
-        <h4>暂无日志</h4>
-        <p>当前筛选条件下没有找到日志记录</p>
+        <h4>No Logs</h4>
+        <p>No log entries found with current filters</p>
       </div>
 
       <div v-else class="log-list">
@@ -74,7 +74,7 @@
           <div class="log-message">{{ log.message }}</div>
           <div v-if="log.data" class="log-data" @click="toggleLogData(log.id)">
             <span class="data-toggle">
-              {{ expandedLogs.has(log.id) ? '▼' : '▶' }} 数据
+              {{ expandedLogs.has(log.id) ? '▼' : '▶' }} Data
             </span>
             <div v-if="expandedLogs.has(log.id)" class="data-content">
               <pre>{{ formatLogData(log.data) }}</pre>
@@ -89,17 +89,17 @@
             :disabled="currentPage <= 1"
             class="page-btn"
           >
-            上一页
+            Previous
           </button>
           <span class="page-info">
-            第 {{ currentPage }} / {{ totalPages }} 页
+            Page {{ currentPage }} / {{ totalPages }}
           </span>
           <button
             @click="currentPage++"
             :disabled="currentPage >= totalPages"
             class="page-btn"
           >
-            下一页
+            Next
           </button>
         </div>
       </div>
@@ -149,7 +149,7 @@ export default {
         this.updateStats()
         this.filterLogs()
       } catch (error) {
-        logger.error('加载日志失败:', error)
+        logger.error('Failed to load logs:', error)
       } finally {
         this.loading = false
       }
@@ -184,7 +184,7 @@ export default {
     },
 
     async clearLogs() {
-      if (confirm('确定要清空所有日志吗？此操作不可恢复。')) {
+      if (confirm('Are you sure you want to clear all logs? This action cannot be undone.')) {
         logger.clearLogs()
         await this.loadLogs()
       }
@@ -207,7 +207,7 @@ export default {
     },
 
     formatTime(timestamp) {
-      return new Date(timestamp).toLocaleString('zh-CN')
+      return new Date(timestamp).toLocaleString('en-US')
     },
 
     formatLogData(data) {

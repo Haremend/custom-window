@@ -175,6 +175,29 @@ ipcMain.handle('save-config', async (event, config) => {
   }
 })
 
+ipcMain.handle('get-image-data-url', async (event, imagePath) => {
+  try {
+    const data = await fs.readFile(imagePath)
+    const base64 = data.toString('base64')
+    const ext = path.extname(imagePath).toLowerCase()
+    const mimeType = {
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.png': 'image/png',
+      '.gif': 'image/gif',
+      '.bmp': 'image/bmp',
+      '.webp': 'image/webp',
+      '.svg': 'image/svg+xml'
+    }[ext] || 'image/png'
+
+    const dataUrl = `data:${mimeType};base64,${base64}`
+    return dataUrl
+  } catch (error) {
+    console.error('Error reading image file:', imagePath, error.message)
+    throw error
+  }
+})
+
 ipcMain.handle('select-image', async () => {
   const result = await dialog.showOpenDialog({
     properties: ['openFile'],

@@ -15,17 +15,45 @@
           <i class="icon-settings"></i>
           管理路径
         </button>
-        <button @click="showLogViewer = true" class="toolbar-btn">
-          <i class="icon-document"></i>
-          查看日志
-        </button>
+      </div>
 
-        <div class="path-section">
-          <span class="path-label">当前路径:</span>
-          <div class="path-display">
-            <span v-if="currentPath" class="current-path">{{ currentPath }}</span>
-            <span v-else class="no-path">请选择或添加路径</span>
-          </div>
+      <!-- 路径显示栏 -->
+      <div class="path-bar">
+        <div class="path-label">当前路径:</div>
+        <div class="path-display">
+          <span v-if="currentPath" class="current-path">{{ currentPath }}</span>
+          <span v-else class="no-path">请选择或添加路径</span>
+        </div>
+      </div>
+
+      <!-- 排序控制栏 -->
+      <div class="sort-bar" v-if="sortedFolders.length > 0">
+        <div class="sort-controls">
+          <span class="sort-label">排序方式:</span>
+          <button
+            @click="setSortBy('name')"
+            :class="['sort-btn', { active: sortBy === 'name' }]"
+          >
+            名称
+          </button>
+          <button
+            @click="setSortBy('time')"
+            :class="['sort-btn', { active: sortBy === 'time' }]"
+          >
+            修改时间
+          </button>
+          <button
+            @click="setSortBy('count')"
+            :class="['sort-btn', { active: sortBy === 'count' }]"
+          >
+            文件数量
+          </button>
+          <button
+            @click="toggleSortOrder"
+            :class="['sort-btn', { active: sortOrder === 'desc' }]"
+          >
+            {{ sortOrder === 'asc' ? '↑' : '↓' }}
+          </button>
         </div>
       </div>
     </header>
@@ -33,7 +61,7 @@
     <!-- 主要内容区域 -->
     <main class="explorer-main">
       <!-- 文件夹列表 -->
-      <div class="folder-list-container" v-if="showFolderList">
+      <div class="folder-list-container">
         <div class="list-header">
           <div class="col-name" @click="setSortBy('name')">
             名称
@@ -93,15 +121,7 @@
       <!-- 图片列表视图 -->
       <div class="image-list-container" v-if="selectedFolder">
         <div class="image-list-header">
-          <div class="header-left">
-            <button @click="goBackToFolders" class="back-btn">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <path d="M10 12l-4-4 4-4" stroke="currentColor" stroke-width="2" fill="none"/>
-              </svg>
-              返回上级
-            </button>
-            <h3>{{ selectedFolder.name }} - 图片列表</h3>
-          </div>
+          <h3>{{ selectedFolder.name }} - 图片列表</h3>
           <div class="image-count">{{ allImages.length }} 张图片</div>
         </div>
 
@@ -124,12 +144,7 @@
               @click="openImageViewer(image)"
             >
               <div class="image-thumb">
-                <img
-                  :src="imageUrls[image.path] || 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'"
-                  :alt="image.name"
-                  @error="handleImageError(image, $event)"
-                  @load="handleImageLoad(image, $event)"
-                />
+                <img :src="getImageUrl(image.path)" :alt="image.name" />
               </div>
               <div class="image-info">
                 <div class="image-name">{{ image.name }}</div>
@@ -185,30 +200,11 @@
         </div>
       </div>
     </div>
-
-    <!-- 日志查看对话框 -->
-    <div v-if="showLogViewer" class="modal-overlay" @click="showLogViewer = false">
-      <div class="modal-content modal-large" @click.stop>
-        <div class="modal-header">
-          <h3>系统日志</h3>
-          <button @click="showLogViewer = false" class="btn-close">×</button>
-        </div>
-        <div class="modal-body" style="padding: 0; height: 70vh;">
-          <LogViewer />
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
 <script>
-import logger from './utils/logger'
-import LogViewer from './components/LogViewer.vue'
-
 export default {
-  components: {
-    LogViewer
-  },
   data() {
     return {
       watchedPaths: [],
@@ -222,10 +218,7 @@ export default {
       sortBy: 'count',
       sortOrder: 'desc',
       currentPath: '',
-      loadedImages: new Set(),
-      showFolderList: true,
-      showLogViewer: false,
-      imageUrls: {} // 存储图片URL
+      loadedImages: new Set()
     }
   },
   computed: {
@@ -261,36 +254,24 @@ export default {
   },
   methods: {
     async addPath() {
-      logger.info('Starting to add path')
       try {
         if (window.electronAPI) {
-          logger.debug('Calling Electron folder selection dialog')
           const folderPath = await window.electronAPI.selectFolder()
-
           if (folderPath) {
-            logger.info('User selected folder:', folderPath)
-
             if (!this.watchedPaths.includes(folderPath)) {
               this.watchedPaths.push(folderPath)
               this.currentPath = folderPath
-              logger.debug('Starting to refresh folder statistics')
               await this.refreshFolderStats(folderPath)
-              logger.debug('Starting to save configuration')
               await this.saveConfig()
-              logger.info('Path added successfully:', folderPath)
             } else {
-              logger.warn('Path already exists:', folderPath)
               alert('该路径已存在')
             }
-          } else {
-            logger.info('User cancelled folder selection')
           }
         } else {
-          logger.error('Electron API not available')
           alert('Electron API not available')
         }
       } catch (error) {
-        logger.error('Failed to add path:', error)
+        console.error('Error adding path:', error)
         alert('添加路径失败: ' + error.message)
       }
     },
@@ -334,32 +315,20 @@ export default {
 
     async loadConfig() {
       try {
-        console.log('[DEBUG] loadConfig: checking electronAPI')
         if (window.electronAPI) {
-          console.log('[DEBUG] loadConfig: calling loadConfig')
           const config = await window.electronAPI.loadConfig()
-          console.log('[DEBUG] loadConfig: result:', JSON.stringify(config))
-          if (config && config.watchedPaths && config.watchedPaths.length > 0) {
+          if (config) {
             this.watchedPaths = config.watchedPaths || []
             this.currentPath = this.watchedPaths[0] || ''
             for (const path of this.watchedPaths) {
               await this.refreshFolderStats(path)
             }
-          } else {
-            // 如果没有配置或配置为空，自动添加测试路径
-            logger.info('No config or empty config found, adding default test path')
-            this.watchedPaths = ['D:\\Joy\\SDWebImg']
-            this.currentPath = this.watchedPaths[0]
-            await this.refreshFolderStats(this.currentPath)
           }
-        } else {
-          console.log('[DEBUG] loadConfig: electronAPI not available')
         }
       } catch (error) {
-        console.error('[DEBUG] Error loading config:', error)
+        console.error('Error loading config:', error)
       } finally {
         this.configLoaded = true
-        console.log('[DEBUG] loadConfig completed')
       }
     },
 
@@ -386,53 +355,27 @@ export default {
           }
         }
       } catch (error) {
-        logger.error('Error refreshing folder stats:', error, { path: folderPath })
+        console.error('Error refreshing folder stats:', error)
       }
     },
 
     async selectFolder(folder) {
-      logger.info('Selecting folder:', folder.name, folder.path)
       try {
         this.selectedFolder = folder
         this.allImages = []
         this.loadedImages.clear()
-        this.showFolderList = false
 
         if (window.electronAPI) {
-          logger.debug('Starting to load images from folder')
           this.loadingImages = true
-
-          const startTime = Date.now()
           const images = await window.electronAPI.getImagesInFolder(folder.path)
-          const loadTime = Date.now() - startTime
-
           this.allImages = images || []
-
-          logger.info(`Image loading completed: ${images.length} images loaded in ${loadTime}ms`)
-
-          // 预加载所有图片的URL
-          if (images.length > 0) {
-            this.preloadImageUrls(images)
-          }
-
-          if (images.length === 0) {
-            logger.warn('No image files found in folder:', folder.path)
-          }
-        } else {
-          logger.error('Electron API not available, cannot load images')
         }
       } catch (error) {
-        logger.error('Failed to select folder:', error, { folder: folder.path })
+        console.error('Error selecting folder:', error)
         alert('加载文件夹失败: ' + error.message)
       } finally {
         this.loadingImages = false
       }
-    },
-
-    goBackToFolders() {
-      this.showFolderList = true
-      this.selectedFolder = null
-      this.allImages = []
     },
 
     setSortBy(sortType) {
@@ -448,23 +391,12 @@ export default {
       this.sortOrder = this.sortOrder === 'asc' ? 'desc' : 'asc'
     },
 
-    async getImageUrl(imagePath) {
-      if (!imagePath) {
-        logger.warn('Attempting to get image URL for empty path')
-        return ''
+    getImageUrl(imagePath) {
+      if (!imagePath) return ''
+      if (window.electronAPI) {
+        const cleanPath = imagePath.replace(/\\/g, '/')
+        return `local:///${cleanPath}`
       }
-
-      if (window.electronAPI && window.electronAPI.getImageDataUrl) {
-        try {
-          const dataUrl = await window.electronAPI.getImageDataUrl(imagePath)
-          return dataUrl
-        } catch (error) {
-          logger.error('Failed to generate image Data URL:', error.message, { path: imagePath })
-          return ''
-        }
-      }
-
-      logger.debug('Using original path as URL (non-Electron environment):', imagePath)
       return imagePath
     },
 
@@ -533,48 +465,11 @@ export default {
           newWindow.document.close()
         }
       }
-    },
-
-    handleImageLoad(image, event) {
-      logger.debug('Image loaded successfully:', {
-        name: image.name,
-        path: image.path
-      })
-    },
-
-    handleImageError(image, event) {
-      const errorMsg = event.target.error?.message || 'Unknown error'
-      logger.error('Failed to load image:', {
-        name: image.name,
-        path: image.path,
-        error: errorMsg
-      })
-    },
-
-    async preloadImageUrls(images) {
-      // Preload URLs for all images
-      for (const image of images) {
-        try {
-          const dataUrl = await this.getImageUrl(image.path)
-          if (dataUrl) {
-            this.imageUrls[image.path] = dataUrl
-          }
-        } catch (error) {
-          logger.error('Failed to preload image URL:', error.message, { image: image.name })
-        }
-      }
     }
   },
   async mounted() {
-    logger.info('App component mounting started')
-    logger.info('Electron API available:', !!window.electronAPI)
-
-    try {
-      await this.loadConfig()
-      logger.info('Configuration loading completed')
-    } catch (error) {
-      logger.error('Failed to load configuration:', error)
-    }
+    console.log('App mounted, Electron API available:', !!window.electronAPI)
+    await this.loadConfig()
   }
 }
 </script>
@@ -597,11 +492,9 @@ export default {
 
 .header-toolbar {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  gap: 8px;
   padding: 8px 16px;
   border-bottom: 1px solid #e1e5e9;
-  flex-wrap: wrap;
 }
 
 .toolbar-btn {
@@ -623,32 +516,29 @@ export default {
   border-color: #2196f3;
 }
 
-.path-section {
+.path-bar {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-left: auto;
-  padding-left: 16px;
+  padding: 8px 16px;
+  background: #ffffff;
+  border-bottom: 1px solid #e1e5e9;
 }
 
 .path-label {
   font-size: 13px;
   color: #666666;
+  margin-right: 8px;
   font-weight: 500;
-  white-space: nowrap;
 }
 
 .path-display {
+  flex: 1;
   font-size: 13px;
   color: #333333;
   padding: 4px 8px;
   background: #f5f5f5;
   border: 1px solid #e1e5e9;
   border-radius: 3px;
-  max-width: 400px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .current-path {
@@ -658,6 +548,46 @@ export default {
 .no-path {
   color: #999999;
   font-style: italic;
+}
+
+.sort-bar {
+  padding: 6px 16px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e1e5e9;
+}
+
+.sort-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sort-label {
+  font-size: 12px;
+  color: #666666;
+  font-weight: 500;
+}
+
+.sort-btn {
+  padding: 4px 8px;
+  background: #ffffff;
+  border: 1px solid #d1d9e0;
+  border-radius: 3px;
+  font-size: 11px;
+  color: #333333;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.sort-btn:hover {
+  background: #f5f5f5;
+  border-color: #2196f3;
+}
+
+.sort-btn.active {
+  background: #2196f3;
+  color: #ffffff;
+  border-color: #1976d2;
 }
 
 .explorer-main {
@@ -802,431 +732,4 @@ export default {
 }
 
 .folder-name {
-  font-size: 13px;
-  color: #333333;
-  font-weight: 500;
-}
-
-.image-list-container {
-  flex: 2;
-  display: flex;
-  flex-direction: column;
-  background: #ffffff;
-  overflow: hidden;
-}
-
-.image-list-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 16px;
-  background: #f8f9fa;
-  border-bottom: 1px solid #e1e5e9;
-}
-
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.back-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  background: #ffffff;
-  border: 1px solid #d1d9e0;
-  border-radius: 3px;
-  font-size: 12px;
-  color: #333333;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.back-btn:hover {
-  background: #e3f2fd;
-  border-color: #2196f3;
-  color: #2196f3;
-}
-
-.image-list-header h3 {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: #333333;
-}
-
-.image-count {
-  font-size: 12px;
-  color: #666666;
-  background: #e1e5e9;
-  padding: 2px 8px;
-  border-radius: 10px;
-}
-
-.image-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 16px;
-}
-
-.image-grid-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 16px;
-}
-
-.image-item {
-  background: #ffffff;
-  border: 1px solid #e1e5e9;
-  border-radius: 6px;
-  overflow: hidden;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.image-item:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  border-color: #2196f3;
-}
-
-.image-thumb {
-  aspect-ratio: 1;
-  overflow: hidden;
-  background: #f5f5f5;
-  position: relative;
-}
-
-.image-thumb img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transition: transform 0.3s ease;
-}
-
-.image-loading {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.8);
-}
-
-.spinner.small {
-  width: 20px;
-  height: 20px;
-  border: 2px solid #e1e5e9;
-  border-top: 2px solid #2196f3;
-  margin-bottom: 0;
-}
-
-.image-item:hover .image-thumb img {
-  transform: scale(1.05);
-}
-
-.image-info {
-  padding: 8px 12px;
-}
-
-.image-name {
-  font-size: 12px;
-  font-weight: 500;
-  color: #333333;
-  margin-bottom: 4px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.image-meta {
-  font-size: 11px;
-  color: #666666;
-}
-
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  animation: fadeIn 0.2s ease;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-.modal-content {
-  background: #ffffff;
-  border-radius: 8px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-  width: 600px;
-  max-width: 90vw;
-  max-height: 80vh;
-  overflow: hidden;
-  animation: slideIn 0.3s ease;
-}
-
-.modal-large {
-  width: 90vw;
-  max-width: 1200px;
-  height: 85vh;
-}
-
-@keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateY(-20px) scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-.modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 20px;
-  background: #f8f9fa;
-  border-bottom: 1px solid #e1e5e9;
-}
-
-.modal-header h3 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: #333333;
-}
-
-.btn-close {
-  background: none;
-  border: none;
-  font-size: 24px;
-  color: #666666;
-  cursor: pointer;
-  padding: 0;
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-  transition: all 0.15s ease;
-}
-
-.btn-close:hover {
-  background: #e1e5e9;
-  color: #333333;
-}
-
-.modal-body {
-  padding: 20px;
-  max-height: 50vh;
-  overflow-y: auto;
-}
-
-.empty-paths {
-  text-align: center;
-  padding: 40px 20px;
-  color: #666666;
-}
-
-.path-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.path-item {
-  display: flex;
-  align-items: center;
-  padding: 12px 16px;
-  background: #f8f9fa;
-  border: 1px solid #e1e5e9;
-  border-radius: 6px;
-  transition: all 0.15s ease;
-}
-
-.path-item:hover {
-  background: #f0f0f0;
-  border-color: #d1d9e0;
-}
-
-.path-info {
-  flex: 1;
-  margin-right: 12px;
-}
-
-.path-name {
-  font-size: 14px;
-  font-weight: 500;
-  color: #333333;
-  margin-bottom: 4px;
-}
-
-.path-full {
-  font-size: 12px;
-  color: #666666;
-  font-family: 'Consolas', 'Courier New', monospace;
-  margin-bottom: 6px;
-}
-
-.path-stats {
-  display: flex;
-  gap: 8px;
-}
-
-.stat-badge {
-  font-size: 11px;
-  color: #666666;
-  background: #e1e5e9;
-  padding: 2px 6px;
-  border-radius: 10px;
-}
-
-.btn-remove {
-  background: none;
-  border: none;
-  color: #dc3545;
-  cursor: pointer;
-  padding: 6px;
-  border-radius: 4px;
-  transition: all 0.15s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.btn-remove:hover {
-  background: #ffe6e6;
-  color: #c82333;
-}
-
-.modal-footer {
-  padding: 16px 20px;
-  background: #f8f9fa;
-  border-top: 1px solid #e1e5e9;
-  display: flex;
-  justify-content: flex-end;
-}
-
-.btn {
-  padding: 8px 16px;
-  border-radius: 4px;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  border: 1px solid transparent;
-}
-
-.btn-secondary {
-  background: #ffffff;
-  border-color: #d1d9e0;
-  color: #333333;
-}
-
-.btn-secondary:hover {
-  background: #f5f5f5;
-  border-color: #b0b0b0;
-}
-
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: #f1f1f1;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #a8a8a8;
-}
-
-@media (max-width: 768px) {
-  .explorer-main {
-    flex-direction: column;
-  }
-
-  .folder-list-container {
-    border-right: none;
-    border-bottom: 1px solid #e1e5e9;
-  }
-
-  .image-grid-list {
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-    gap: 12px;
-  }
-
-  .modal-content {
-    width: 95vw;
-    margin: 10px;
-  }
-
-  .list-header {
-    padding: 8px 12px;
-  }
-
-  .folder-row {
-    padding: 8px 12px;
-  }
-
-  .col-name {
-    min-width: 150px;
-  }
-
-  .col-time {
-    min-width: 120px;
-  }
-}
-
-@media (max-width: 480px) {
-  .header-toolbar {
-    padding: 8px 12px;
-    gap: 6px;
-  }
-
-  .toolbar-btn {
-    padding: 4px 8px;
-    font-size: 11px;
-  }
-
-  .path-bar {
-    padding: 6px 12px;
-  }
-
-  .sort-bar {
-    padding: 6px 12px;
-  }
-
-  .image-grid-list {
-    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-    gap: 8px;
-  }
-
-  .col-time {
-    display: none;
-  }
-}
-</style>
+  font-size:</style>

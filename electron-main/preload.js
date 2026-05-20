@@ -6,5 +6,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getImagesInFolder: (folderPath) => ipcRenderer.invoke('get-images-in-folder', folderPath),
   loadConfig: () => ipcRenderer.invoke('load-config'),
   saveConfig: (config) => ipcRenderer.invoke('save-config', config),
-  selectImage: () => ipcRenderer.invoke('select-image')
+  readLogFile: () => ipcRenderer.invoke('read-log-file'),
+  writeLogFile: (logData) => ipcRenderer.invoke('write-log-file', logData),
+  getImageDataUrl: (imagePath) => ipcRenderer.invoke('get-image-data-url', imagePath)
 })

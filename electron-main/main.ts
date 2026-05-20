@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, protocol, session } from 'electron'
 import path from 'path'
 import fs from 'fs/promises'
 import { app as electronApp } from 'electron'
@@ -7,6 +7,21 @@ const __dirname = path.resolve()
 
 // 日志文件路径
 const LOG_FILE_PATH = path.join(electronApp.getPath('userData'), 'image-manager-logs.json')
+
+// 注册特权协议
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'local',
+    privileges: {
+      secure: true,
+      standard: true,
+      supportFetchAPI: true,
+      allowServiceWorkers: true,
+      corsEnabled: true,
+      stream: true
+    }
+  }
+])
 
 // 图片文件扩展名
 const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg']
@@ -18,7 +33,9 @@ function createWindow() {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      webSecurity: false, // 禁用web安全策略以允许本地文件访问
+      allowRunningInsecureContent: true // 允许运行不安全内容
     }
   })
 
@@ -171,7 +188,50 @@ ipcMain.handle('save-config', async (_, config: any) => {
   }
 })
 
+// 获取图片的 Data URL
+ipcMain.handle('get-image-data-url', async (_, imagePath: string) => {
+  try {
+    console.log('[Electron Main] Reading image for Data URL:', imagePath)
+    const data = await fs.readFile(imagePath)
+    const base64 = data.toString('base64')
+    const ext = path.extname(imagePath).toLowerCase()
+    const mimeType = {
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.png': 'image/png',
+      '.gif': 'image/gif',
+      '.bmp': 'image/bmp',
+      '.webp': 'image/webp',
+      '.svg': 'image/svg+xml'
+    }[ext] || 'image/png'
+
+    const dataUrl = `data:${mimeType};base64,${base64}`
+    console.log('[Electron Main] Generated Data URL for:', imagePath, 'Size:', base64.length)
+    return dataUrl
+  } catch (error) {
+    console.error('[Electron Main] Error reading image:', imagePath, error.message)
+    throw error
+  }
+})
+
 app.whenReady().then(() => {
+  // 注册自定义协议
+  protocol.registerFileProtocol('app', (request, callback) => {
+    console.log('[Electron Main] App protocol request:', request.url)
+    const url = request.url.replace('app://', '')
+    const decodedPath = decodeURIComponent(url)
+    console.log('[Electron Main] Serving file:', decodedPath)
+
+    // 检查文件是否存在
+    fs.access(decodedPath).then(() => {
+      console.log('[Electron Main] File exists, serving:', decodedPath)
+      callback({ path: decodedPath })
+    }).catch((error) => {
+      console.error('[Electron Main] File not found:', decodedPath, error.message)
+      callback({ error: 'net::ERR_FILE_NOT_FOUND' })
+    })
+  })
+
   createWindow()
 
   app.on('activate', function () {

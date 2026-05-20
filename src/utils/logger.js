@@ -12,12 +12,12 @@ class Logger {
       ERROR: 3
     };
 
-    this.currentLevel = this.levels.INFO;
-    this.maxLogEntries = 1000; // 最大日志条数
+    this.currentLevel = this.levels.DEBUG;
+    this.maxLogEntries = 1000; // Maximum log entries
     this.logKey = 'image-manager-logs';
     this.logs = this.loadLogsFromStorage();
 
-    // 初始化时清理过期日志
+    // Clean up old logs on initialization
     this.cleanupOldLogs();
   }
 
@@ -27,7 +27,7 @@ class Logger {
   setLevel(level) {
     if (this.levels.hasOwnProperty(level)) {
       this.currentLevel = this.levels[level];
-      console.log(`[Logger] 日志级别设置为: ${level}`);
+      console.log(`[Logger] Log level set to: ${level}`);
     }
   }
 
@@ -134,7 +134,7 @@ class Logger {
       const stored = localStorage.getItem(this.logKey);
       return stored ? JSON.parse(stored) : [];
     } catch (error) {
-      console.error('加载日志失败:', error);
+      console.error('Failed to load logs:', error);
       return [];
     }
   }
@@ -146,7 +146,7 @@ class Logger {
     try {
       localStorage.setItem(this.logKey, JSON.stringify(this.logs));
     } catch (error) {
-      console.error('保存日志失败:', error);
+      console.error('Failed to save logs:', error);
     }
   }
 
@@ -196,7 +196,7 @@ class Logger {
   clearLogs() {
     this.logs = [];
     this.saveLogsToStorage();
-    console.log('[Logger] 日志已清空');
+    console.log('[Logger] All logs cleared');
   }
 
   /**
