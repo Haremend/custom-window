@@ -7,5 +7,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   loadConfig: () => ipcRenderer.invoke('load-config'),
   saveConfig: (config: any) => ipcRenderer.invoke('save-config', config),
   readLogFile: () => ipcRenderer.invoke('read-log-file'),
-  writeLogFile: (logData: string) => ipcRenderer.invoke('write-log-file', logData)
+  writeLogFile: (logData: string) => ipcRenderer.invoke('write-log-file', logData),
+  getImageDataUrl: (imagePath: string) => ipcRenderer.invoke('get-image-data-url', imagePath),
+  getThumbnail: (imagePath: string) => ipcRenderer.invoke('get-thumbnail', imagePath),
+  generateThumbnails: (imagePaths: string[]) => ipcRenderer.invoke('generate-thumbnails', imagePaths)
 })

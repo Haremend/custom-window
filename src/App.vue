@@ -27,6 +27,19 @@
             <span v-else class="no-path">请选择或添加路径</span>
           </div>
         </div>
+
+        <div class="size-control">
+          <label class="size-label">图片大小:</label>
+          <input
+            type="range"
+            v-model="imageSize"
+            min="200"
+            max="1024"
+            step="10"
+            class="size-slider"
+          >
+          <span class="size-value">{{ imageSize }}px</span>
+        </div>
       </div>
     </header>
 
@@ -116,25 +129,55 @@
             <h3>该文件夹暂无图片</h3>
           </div>
 
-          <div v-else class="image-grid-list">
-            <div
-              v-for="image in allImages"
-              :key="image.path"
-              class="image-item"
-              @click="openImageViewer(image)"
-            >
-              <div class="image-thumb">
-                <img
-                  :src="imageUrls[image.path] || 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'"
-                  :alt="image.name"
-                  @error="handleImageError(image, $event)"
-                  @load="handleImageLoad(image, $event)"
-                />
-              </div>
-              <div class="image-info">
-                <div class="image-name">{{ image.name }}</div>
-                <div class="image-meta">
-                  {{ formatFileSize(image.size) }} • {{ formatDate(image.lastModified) }}
+          <div v-else>
+            <div v-if="isGeneratingThumbnails" class="thumbnail-loading-state">
+              <div class="spinner"></div>
+              <span>正在生成缩略图...</span>
+            </div>
+
+            <div v-else class="image-grid-container">
+              <div
+                class="image-grid-list"
+                :style="{ 'grid-template-columns': `repeat(auto-fill, minmax(${gridMinWidth}px, 1fr))` }"
+              >
+                <div
+                  v-for="image in allImages"
+                  :key="image.path"
+                  class="image-item"
+                  :style="imageContainerStyle"
+                  @click="openImageViewer(image)"
+                >
+                  <div
+                    class="image-thumb"
+                    :style="imageThumbStyle"
+                    :ref="el => { if (el) observeImage(el, image.path) }"
+                  >
+                    <img
+                      v-if="thumbnailUrls[image.path]"
+                      :src="thumbnailUrls[image.path]"
+                      :alt="image.name"
+                      @error="handleImageError(image, $event)"
+                      @load="handleImageLoad(image, $event)"
+                      decoding="async"
+                    />
+                    <img
+                      v-else-if="imageUrls[image.path]"
+                      :src="imageUrls[image.path]"
+                      :alt="image.name"
+                      @error="handleImageError(image, $event)"
+                      @load="handleImageLoad(image, $event)"
+                      decoding="async"
+                    />
+                    <div v-else class="image-loading">
+                      <div class="spinner small"></div>
+                    </div>
+                  </div>
+                  <div class="image-info">
+                    <div class="image-name">{{ image.name }}</div>
+                    <div class="image-meta">
+                      {{ formatFileSize(image.size) }} • {{ formatDate(image.lastModified) }}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -204,10 +247,15 @@
 <script>
 import logger from './utils/logger'
 import LogViewer from './components/LogViewer.vue'
+import { RecycleScroller, DynamicScroller, DynamicScrollerItem } from 'vue-virtual-scroller'
+import 'vue-virtual-scroller/dist/vue-virtual-scroller.css'
 
 export default {
   components: {
-    LogViewer
+    LogViewer,
+    RecycleScroller,
+    DynamicScroller,
+    DynamicScrollerItem
   },
   data() {
     return {
@@ -225,7 +273,18 @@ export default {
       loadedImages: new Set(),
       showFolderList: true,
       showLogViewer: false,
-      imageUrls: {} // 存储图片URL
+      imageUrls: {}, // 存储图片URL
+      thumbnailUrls: {}, // 存储缩略图URL
+      visibleImages: [], // 当前可见的图片
+      imageLoadQueue: [], // 图片加载队列
+      isGeneratingThumbnails: false, // 缩略图生成状态
+      imageSize: 200, // 图片容器高度，保持1.25高宽比（高:宽 = 1.25:1）
+      // 缓存管理
+      maxCacheSize: 1000, // 最大缓存数量
+      cacheCleanupInterval: null, // 缓存清理定时器
+      // 懒加载
+      intersectionObserver: null, // Intersection Observer 实例
+      visibleImageSet: new Set(), // 当前可见的图片集合
     }
   },
   computed: {
@@ -257,6 +316,45 @@ export default {
     },
     totalImages() {
       return this.sortedFolders.reduce((total, folder) => total + folder.imageCount, 0)
+    },
+
+    // 计算图片容器尺寸，保持1.25高宽比（高:宽 = 1.25:1）
+    imageContainerStyle() {
+      const height = this.imageSize
+      const width = height / 1.25  // 高:宽 = 1.25:1，所以宽 = 高/1.25
+
+      // 确保最小宽度和合理的最大宽度
+      const finalWidth = Math.max(100, Math.min(width, 400))
+
+      return {
+        height: `${height}px`,
+        width: `${finalWidth}px`
+      }
+    },
+
+    // 计算图片显示区域尺寸
+    imageThumbStyle() {
+      const height = this.imageSize * 0.8 // 图片区域占容器的80%
+      return {
+        height: `${height}px`
+      }
+    },
+
+    // 计算网格列的最小宽度（基于图片容器宽度）
+    gridMinWidth() {
+      const imageWidth = this.imageSize / 1.25 // 根据1.25比例计算宽度
+      // 确保最小宽度不会太大，保证至少显示2列
+      const minWidth = Math.max(100, Math.min(imageWidth + 20, 250))
+      return minWidth
+    },
+
+    // 响应式断点计算
+    responsiveGridColumns() {
+      // 可以根据窗口大小动态调整列数
+      const containerWidth = this.$el?.clientWidth || 800
+      const minItemWidth = this.gridMinWidth
+      const columns = Math.floor(containerWidth / minItemWidth)
+      return Math.max(1, Math.min(columns, 8)) // 限制在1-8列之间
     }
   },
   methods: {
@@ -410,9 +508,10 @@ export default {
 
           logger.info(`Image loading completed: ${images.length} images loaded in ${loadTime}ms`)
 
-          // 预加载所有图片的URL
+          // 为图片处理缩略图（使用懒加载）
           if (images.length > 0) {
-            this.preloadImageUrls(images)
+            // 只加载已存在的缩略图，缺失的会在滚动到时生成
+            await this.loadExistingThumbnails(images)
           }
 
           if (images.length === 0) {
@@ -549,10 +648,106 @@ export default {
         path: image.path,
         error: errorMsg
       })
+
+      // 如果缩略图加载失败，尝试使用原始图片
+      if (this.thumbnailUrls[image.path] && this.thumbnailUrls[image.path].startsWith('app://')) {
+        logger.info('Thumbnail failed, trying original image for:', image.name)
+        this.loadOriginalImage(image.path)
+      }
+    },
+
+    async generateThumbnails(images) {
+      logger.info('Starting thumbnail generation for', images.length, 'images')
+      this.isGeneratingThumbnails = true
+
+      try {
+        // 过滤出还没有缩略图的图片
+        const imagesNeedingThumbnails = images.filter(img => !this.thumbnailUrls[img.path])
+
+        if (imagesNeedingThumbnails.length === 0) {
+          logger.info('All images already have thumbnails cached')
+          this.isGeneratingThumbnails = false
+          return
+        }
+
+        logger.info(`Need to generate thumbnails for ${imagesNeedingThumbnails.length} images`)
+
+        // 分批处理缩略图生成，避免一次性处理太多图片
+        const batchSize = 20
+        for (let i = 0; i < imagesNeedingThumbnails.length; i += batchSize) {
+          const batch = imagesNeedingThumbnails.slice(i, i + batchSize)
+          const imagePaths = batch.map(img => img.path)
+
+          try {
+            const results = await window.electronAPI.generateThumbnails(imagePaths)
+
+            // 处理结果
+            for (const result of results) {
+              if (result.success) {
+                // 使用 app:// 协议访问本地文件
+                this.thumbnailUrls[result.originalPath] = `app://${result.thumbnailPath}`
+              } else {
+                logger.error('Failed to generate thumbnail:', result.error, { path: result.originalPath })
+                // 失败时立即加载原始图片的 Data URL
+                this.loadOriginalImage(result.originalPath)
+              }
+            }
+          } catch (error) {
+            logger.error('Error generating thumbnail batch:', error.message)
+            // 出错时加载原始图片
+            for (const img of batch) {
+              this.loadOriginalImage(img.path)
+            }
+          }
+
+          // 给 UI 一点更新时间
+          await new Promise(resolve => setTimeout(resolve, 10))
+        }
+
+        logger.info('Thumbnail generation completed')
+      } catch (error) {
+        logger.error('Error in thumbnail generation:', error.message)
+      } finally {
+        this.isGeneratingThumbnails = false
+      }
+    },
+
+    async loadOriginalImage(imagePath) {
+      // 直接加载原始图片的 Data URL 作为回退
+      try {
+        const dataUrl = await this.getImageUrl(imagePath)
+        if (dataUrl) {
+          this.thumbnailUrls[imagePath] = dataUrl
+        } else {
+          // 使用占位图
+          this.thumbnailUrls[imagePath] = this.getPlaceholderImage()
+        }
+      } catch (error) {
+        logger.error('Failed to load original image:', error.message, { path: imagePath })
+        // 使用占位图
+        this.thumbnailUrls[imagePath] = this.getPlaceholderImage()
+      }
+    },
+
+    getPlaceholderImage() {
+      // 返回一个简单的 SVG 占位图
+      return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjBmMGYwIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPuWbvueJh+WkqeivlTwvdGV4dD48L3N2Zz4='
+    },
+
+    async loadExistingThumbnails(images) {
+      // 检查哪些图片已经有缩略图缓存
+      for (const image of images) {
+        try {
+          const thumbnailPath = await window.electronAPI.getThumbnail(image.path)
+          this.thumbnailUrls[image.path] = `app://${thumbnailPath}`
+        } catch (error) {
+          // 缩略图不存在，后续会生成
+        }
+      }
     },
 
     async preloadImageUrls(images) {
-      // Preload URLs for all images
+      // Preload URLs for all images (fallback for original images)
       for (const image of images) {
         try {
           const dataUrl = await this.getImageUrl(image.path)
@@ -563,11 +758,124 @@ export default {
           logger.error('Failed to preload image URL:', error.message, { image: image.name })
         }
       }
+    },
+
+    // 缓存清理方法
+    cleanupCache() {
+      // 清理 thumbnailUrls 缓存
+      if (Object.keys(this.thumbnailUrls).length > this.maxCacheSize) {
+        logger.info('Cleaning up thumbnail cache...')
+        const entries = Object.entries(this.thumbnailUrls)
+        const toRemove = entries.slice(0, entries.length - this.maxCacheSize)
+        toRemove.forEach(([path]) => {
+          delete this.thumbnailUrls[path]
+        })
+        logger.info(`Cleaned up ${toRemove.length} thumbnail cache entries`)
+      }
+
+      // 清理 imageUrls 缓存
+      if (Object.keys(this.imageUrls).length > this.maxCacheSize) {
+        logger.info('Cleaning up image cache...')
+        const entries = Object.entries(this.imageUrls)
+        const toRemove = entries.slice(0, entries.length - this.maxCacheSize)
+        toRemove.forEach(([path]) => {
+          delete this.imageUrls[path]
+        })
+        logger.info(`Cleaned up ${toRemove.length} image cache entries`)
+      }
+    },
+
+    // 启动缓存清理定时器
+    startCacheCleanup() {
+      if (this.cacheCleanupInterval) {
+        clearInterval(this.cacheCleanupInterval)
+      }
+      this.cacheCleanupInterval = setInterval(() => {
+        this.cleanupCache()
+      }, 300000) // 5分钟清理一次
+    },
+
+    // 停止缓存清理定时器
+    stopCacheCleanup() {
+      if (this.cacheCleanupInterval) {
+        clearInterval(this.cacheCleanupInterval)
+        this.cacheCleanupInterval = null
+      }
+    },
+
+    // 初始化 Intersection Observer
+    initIntersectionObserver() {
+      if (this.intersectionObserver) {
+        this.intersectionObserver.disconnect()
+      }
+
+      this.intersectionObserver = new IntersectionObserver(
+        (entries) => {
+          entries.forEach(entry => {
+            const imagePath = entry.target.dataset.imagePath
+            if (entry.isIntersecting) {
+              if (imagePath && !this.visibleImageSet.has(imagePath)) {
+                this.visibleImageSet.add(imagePath)
+                this.preloadImageIfNeeded(imagePath)
+              }
+            } else {
+              if (imagePath) {
+                this.visibleImageSet.delete(imagePath)
+              }
+            }
+          })
+        },
+        {
+          rootMargin: '100px', // 提前100px开始加载
+          threshold: 0.1
+        }
+      )
+    },
+
+    // 观察图片元素
+    observeImage(element, imagePath) {
+      if (element && this.intersectionObserver && imagePath) {
+        element.dataset.imagePath = imagePath
+        this.intersectionObserver.observe(element)
+      }
+    },
+
+    // 预加载图片
+    async preloadImageIfNeeded(imagePath) {
+      if (this.thumbnailUrls[imagePath] || this.imageUrls[imagePath]) {
+        return // 已经加载过了
+      }
+
+      try {
+        // 优先尝试加载缩略图
+        const thumbnailPath = await window.electronAPI.getThumbnail(imagePath)
+        if (thumbnailPath) {
+          this.thumbnailUrls[imagePath] = `app://${thumbnailPath}`
+        }
+      } catch (error) {
+        logger.warn('Failed to get thumbnail, loading original:', error.message)
+        // 失败时加载原始图片
+        this.loadOriginalImage(imagePath)
+      }
+    },
+
+    // 停止观察
+    stopObserving() {
+      if (this.intersectionObserver) {
+        this.intersectionObserver.disconnect()
+        this.intersectionObserver = null
+      }
+      this.visibleImageSet.clear()
     }
   },
   async mounted() {
     logger.info('App component mounting started')
     logger.info('Electron API available:', !!window.electronAPI)
+
+    // 启动缓存清理定时器
+    this.startCacheCleanup()
+    // 初始化 Intersection Observer
+    this.initIntersectionObserver()
 
     try {
       await this.loadConfig()
@@ -575,6 +883,13 @@ export default {
     } catch (error) {
       logger.error('Failed to load configuration:', error)
     }
+  },
+
+  beforeUnmount() {
+    // 清理定时器
+    this.stopCacheCleanup()
+    // 停止观察
+    this.stopObserving()
   }
 }
 </script>
@@ -621,6 +936,48 @@ export default {
 .toolbar-btn:hover {
   background: #e3f2fd;
   border-color: #2196f3;
+}
+
+.size-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 16px;
+  padding: 4px 12px;
+  background: #f5f5f5;
+  border-radius: 4px;
+  border: 1px solid #e1e5e9;
+}
+
+.size-label {
+  font-size: 12px;
+  color: #666666;
+  white-space: nowrap;
+}
+
+.size-slider {
+  width: 100px;
+  height: 4px;
+  outline: none;
+  border-radius: 2px;
+  background: #e1e5e9;
+  -webkit-appearance: none;
+}
+
+.size-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #2196f3;
+  cursor: pointer;
+}
+
+.size-value {
+  font-size: 11px;
+  color: #333333;
+  min-width: 40px;
+  text-align: right;
 }
 
 .path-section {
@@ -867,14 +1224,58 @@ export default {
 
 .image-list {
   flex: 1;
-  overflow-y: auto;
+  overflow-y: auto; /* 改为显示垂直滚动条 */
   padding: 16px;
+  position: relative;
+  height: calc(100vh - 120px); /* 固定高度，留出头部空间 */
+}
+
+.thumbnail-loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  color: #666666;
+  height: 300px;
+}
+
+.image-grid-container {
+  height: 100%;
+  width: 100%;
+  overflow: hidden; /* 隐藏容器滚动，使用虚拟滚动 */
+}
+
+.image-scroller {
+  height: 100%;
+  width: 100%;
+}
+
+/* 虚拟滚动容器样式 */
+.image-scroller {
+  padding: 8px;
+  width: 100%;
+}
+
+/* 虚拟滚动项包装器 */
+.image-scroller :deep(.vue-recycle-scroller__item-wrapper) {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(v-bind(gridMinWidth + 'px'), 1fr));
+  gap: 16px;
+  width: 100%;
+  padding: 0 8px;
+}
+
+/* 虚拟滚动项视图 */
+.image-scroller :deep(.vue-recycle-scroller__item-view) {
+  width: 100%;
 }
 
 .image-grid-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 16px;
+  padding: 8px;
+  align-items: start; /* 确保项目从顶部开始对齐 */
 }
 
 .image-item {
@@ -885,6 +1286,12 @@ export default {
   cursor: pointer;
   transition: all 0.2s ease;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  /* 确保项目不会超出容器 */
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .image-item:hover {
@@ -894,10 +1301,10 @@ export default {
 }
 
 .image-thumb {
-  aspect-ratio: 1;
   overflow: hidden;
   background: #f5f5f5;
   position: relative;
+  width: 100%;
 }
 
 .image-thumb img {

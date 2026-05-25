@@ -10,16 +10,23 @@
     "electron": "electron electron-main/main.js",
     "start": "npm run build && npm run electron"
   },
-  "keywords": ["electron", "vue", "image-tool", "desktop"],
+  "keywords": [
+    "electron",
+    "vue",
+    "image-tool",
+    "desktop"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "vue": "^3.4.0"
+    "sharp": "^0.34.5",
+    "vue": "^3.4.0",
+    "vue-virtual-scroller": "^3.0.4"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.0.0",
-    "vite": "^5.0.0",
+    "concurrently": "^8.2.0",
     "electron": "^28.0.0",
-    "concurrently": "^8.2.0"
+    "vite": "^5.0.0"
   }
 }
