@@ -1,3 +1,23 @@
+/*
+ * 图像管理器Electron应用的主要进程。
+ *
+ * 提供以下关键功能：
+ * - createWindow(): 创建主BrowserWindow，加载开发服务器或构建后的index文件，打开开发者工具。
+ * - IPC处理程序：
+ *   - select-folder: 打开文件夹选择器。
+ *   - get-folder-stats: 返回子文件夹中的图像数量。
+ *   - get-images-in-folder: 列出文件夹中的图像文件。
+ *   - load-config / save-config: 管理用户配置文件。
+ *   - get-image-data-url: 返回图像的数据URL。
+ *   - select-image: 打开图像选择器。
+ *   - get-thumbnail / generate-thumbnails: 管理缩略图缓存和生成。
+ * - 注册'local'和'app'协议。
+ * - 应用生命周期：ready，activate，window-all-closed处理。
+ *
+ * 常量：
+ * - IMAGE_EXTENSIONS: 支持的图像文件扩展名。
+ * - CONFIG_PATH: 配置文件在用户主目录中的路径。
+ */
 const { app, BrowserWindow, ipcMain, dialog, protocol, session } = require('electron')
 const path = require('path')
 const fs = require('fs').promises
@@ -9,6 +29,11 @@ const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.sv
 // 配置文件路径
 const CONFIG_PATH = path.join(os.homedir(), '.image-manager-config.json')
 
+/**
+ * 创建并展示主窗口。
+ * - 加载开发服务器或本地构建的页面。
+ * - 打开开发者工具供调试。
+ */
 function createWindow() {
   const win = new BrowserWindow({
     width: 1200,
@@ -210,14 +235,109 @@ ipcMain.handle('select-image', async () => {
   return null
 })
 
+// 缩略图相关IPC处理器
+ipcMain.handle('get-thumbnail', async (_, imagePath) => {
+  try {
+    const thumbnailDir = path.join(os.homedir(), '.image-manager-thumbnails')
+    const thumbnailName = `${Buffer.from(imagePath).toString('base64')}.webp`
+    const thumbnailPath = path.join(thumbnailDir, thumbnailName)
+
+    // 检查缩略图是否已存在
+    try {
+      await fs.access(thumbnailPath)
+      return thumbnailPath
+    } catch {
+      // 缩略图不存在，返回空字符串让调用者处理
+      return ''
+    }
+  } catch (error) {
+    console.error('Error getting thumbnail:', error)
+    return ''
+  }
+})
+
+ipcMain.handle('generate-thumbnails', async (_, imagePaths) => {
+  const results = []
+
+  try {
+    const thumbnailDir = path.join(os.homedir(), '.image-manager-thumbnails')
+
+    // 确保缩略图目录存在
+    try {
+      await fs.access(thumbnailDir)
+    } catch {
+      await fs.mkdir(thumbnailDir, { recursive: true })
+    }
+
+    for (const imagePath of imagePaths) {
+      try {
+        const thumbnailName = `${Buffer.from(imagePath).toString('base64')}.webp`
+        const thumbnailPath = path.join(thumbnailDir, thumbnailName)
+
+        // 检查缩略图是否已存在
+        try {
+          await fs.access(thumbnailPath)
+          results.push({
+            originalPath: imagePath,
+            thumbnailPath: thumbnailPath,
+            success: true
+          })
+          continue
+        } catch {
+          // 缩略图不存在，需要生成
+        }
+
+        // 生成缩略图
+        const sharp = require('sharp')
+        await sharp(imagePath)
+          .resize(200, 200, { fit: 'inside', withoutEnlargement: true })
+          .webp({ quality: 80 })
+          .toFile(thumbnailPath)
+
+        results.push({
+          originalPath: imagePath,
+          thumbnailPath: thumbnailPath,
+          success: true
+        })
+      } catch (error) {
+        console.error('Error generating thumbnail for', imagePath, ':', error)
+        results.push({
+          originalPath: imagePath,
+          thumbnailPath: '',
+          success: false,
+          error: error.message
+        })
+      }
+    }
+
+    return results
+  } catch (error) {
+    console.error('Error in generate-thumbnails:', error)
+    return imagePaths.map(imagePath => ({
+      originalPath: imagePath,
+      thumbnailPath: '',
+      success: false,
+      error: error.message
+    }))
+  }
+})
+
 // 注册自定义协议来处理本地文件
 protocol.registerSchemesAsPrivileged([
-  { scheme: 'local', privileges: { secure: true, standard: true, supportFetchAPI: true } }
+  { scheme: 'local', privileges: { secure: true, standard: true, supportFetchAPI: true } },
+  { scheme: 'app', privileges: { secure: true, standard: true, supportFetchAPI: true } }
 ])
 
 app.whenReady().then(() => {
   // 注册自定义协议处理器
   protocol.handle('local', (request) => {
+    const url = new URL(request.url)
+    const filePath = decodeURIComponent(url.pathname)
+    return fs.readFile(filePath)
+  })
+
+  // 注册 app:// 协议处理器用于访问缩略图
+  protocol.handle('app', (request) => {
     const url = new URL(request.url)
     const filePath = decodeURIComponent(url.pathname)
     return fs.readFile(filePath)
