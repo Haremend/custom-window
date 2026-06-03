@@ -11,6 +11,7 @@
     "build": "vite build && npm run build:electron",
     "build:electron": "tsc -p tsconfig.json",
     "preview": "vite preview",
+    "clean": "rimraf dist dist-electron",
     "electron": "electron dist-electron/main.js",
     "start": "npm run build && npm run electron"
   },
