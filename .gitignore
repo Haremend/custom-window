@@ -72,3 +72,6 @@ dist-electron/
 *.mas
 *.pkg
 exe/
+
+picTemp/
+.claude

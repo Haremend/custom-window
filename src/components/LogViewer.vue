@@ -15,13 +15,13 @@
           v-model="searchKeyword"
           type="text"
           placeholder="Search logs..."
-          @input="searchLogs"
           class="search-input"
+          @input="searchLogs"
         />
 
-        <button @click="exportLogs" class="btn btn-secondary">Export Logs</button>
-        <button @click="clearLogs" class="btn btn-danger">Clear Logs</button>
-        <button @click="refreshLogs" class="btn btn-primary">Refresh</button>
+        <button class="btn btn-secondary" @click="exportLogs">Export Logs</button>
+        <button class="btn btn-danger" @click="clearLogs">Clear Logs</button>
+        <button class="btn btn-primary" @click="refreshLogs">Refresh</button>
       </div>
     </div>
 
@@ -73,9 +73,7 @@
           </div>
           <div class="log-message">{{ log.message }}</div>
           <div v-if="log.data" class="log-data" @click="toggleLogData(log.id)">
-            <span class="data-toggle">
-              {{ expandedLogs.has(log.id) ? '▼' : '▶' }} Data
-            </span>
+            <span class="data-toggle"> {{ expandedLogs.has(log.id) ? '▼' : '▶' }} Data </span>
             <div v-if="expandedLogs.has(log.id)" class="data-content">
               <pre>{{ formatLogData(log.data) }}</pre>
             </div>
@@ -84,21 +82,11 @@
 
         <!-- 分页 -->
         <div v-if="totalPages > 1" class="log-pagination">
-          <button
-            @click="currentPage--"
-            :disabled="currentPage <= 1"
-            class="page-btn"
-          >
+          <button :disabled="currentPage <= 1" class="page-btn" @click="currentPage--">
             Previous
           </button>
-          <span class="page-info">
-            Page {{ currentPage }} / {{ totalPages }}
-          </span>
-          <button
-            @click="currentPage++"
-            :disabled="currentPage >= totalPages"
-            class="page-btn"
-          >
+          <span class="page-info"> Page {{ currentPage }} / {{ totalPages }} </span>
+          <button :disabled="currentPage >= totalPages" class="page-btn" @click="currentPage++">
             Next
           </button>
         </div>
@@ -108,7 +96,7 @@
 </template>
 
 <script>
-import logger from '../utils/logger'
+import logger from '../utils/logger';
 
 export default {
   name: 'LogViewer',
@@ -127,100 +115,100 @@ export default {
         debug: 0,
         info: 0,
         warn: 0,
-        error: 0
-      }
-    }
+        error: 0,
+      },
+    };
   },
   computed: {
     totalPages() {
-      return Math.ceil(this.filteredLogs.length / this.pageSize)
+      return Math.ceil(this.filteredLogs.length / this.pageSize);
     },
     paginatedLogs() {
-      const start = (this.currentPage - 1) * this.pageSize
-      const end = start + this.pageSize
-      return this.filteredLogs.slice(start, end)
-    }
+      const start = (this.currentPage - 1) * this.pageSize;
+      const end = start + this.pageSize;
+      return this.filteredLogs.slice(start, end);
+    },
+  },
+  mounted() {
+    this.loadLogs();
   },
   methods: {
     async loadLogs() {
-      this.loading = true
+      this.loading = true;
       try {
-        this.logs = logger.getLogs()
-        this.updateStats()
-        this.filterLogs()
+        this.logs = logger.getLogs();
+        this.updateStats();
+        this.filterLogs();
       } catch (error) {
-        logger.error('Failed to load logs:', error)
+        logger.error('Failed to load logs:', error);
       } finally {
-        this.loading = false
+        this.loading = false;
       }
     },
 
     updateStats() {
-      this.stats = logger.getStats()
+      this.stats = logger.getStats();
     },
 
     filterLogs() {
-      let filtered = this.logs
+      let filtered = this.logs;
 
       // 按级别过滤
       if (this.selectedLevel) {
-        filtered = filtered.filter(log => log.level === this.selectedLevel)
+        filtered = filtered.filter((log) => log.level === this.selectedLevel);
       }
 
       // 按关键词搜索
       if (this.searchKeyword) {
-        filtered = logger.searchLogs(this.searchKeyword)
+        filtered = logger.searchLogs(this.searchKeyword);
         if (this.selectedLevel) {
-          filtered = filtered.filter(log => log.level === this.selectedLevel)
+          filtered = filtered.filter((log) => log.level === this.selectedLevel);
         }
       }
 
-      this.filteredLogs = filtered
-      this.currentPage = 1
+      this.filteredLogs = filtered;
+      this.currentPage = 1;
     },
 
     searchLogs() {
-      this.filterLogs()
+      this.filterLogs();
     },
 
     async clearLogs() {
       if (confirm('Are you sure you want to clear all logs? This action cannot be undone.')) {
-        logger.clearLogs()
-        await this.loadLogs()
+        logger.clearLogs();
+        await this.loadLogs();
       }
     },
 
     exportLogs() {
-      logger.exportLogs()
+      logger.exportLogs();
     },
 
     refreshLogs() {
-      this.loadLogs()
+      this.loadLogs();
     },
 
     toggleLogData(logId) {
       if (this.expandedLogs.has(logId)) {
-        this.expandedLogs.delete(logId)
+        this.expandedLogs.delete(logId);
       } else {
-        this.expandedLogs.add(logId)
+        this.expandedLogs.add(logId);
       }
     },
 
     formatTime(timestamp) {
-      return new Date(timestamp).toLocaleString('en-US')
+      return new Date(timestamp).toLocaleString('en-US');
     },
 
     formatLogData(data) {
       if (typeof data === 'object') {
-        return JSON.stringify(data, null, 2)
+        return JSON.stringify(data, null, 2);
       }
-      return String(data)
-    }
+      return String(data);
+    },
   },
-  mounted() {
-    this.loadLogs()
-  }
-}
+};
 </script>
 
 <style scoped>

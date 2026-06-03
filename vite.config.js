@@ -1,22 +1,21 @@
-import { defineConfig } from 'vite'
-import vue from '@vitejs/plugin-vue'
-import { resolve } from 'path'
+import { defineConfig } from 'vite';
+import vue from '@vitejs/plugin-vue';
+import { resolve } from 'path';
 
 export default defineConfig({
+  base: './',
   plugins: [vue()],
   resolve: {
     alias: {
-      '@': resolve(__dirname, 'src')
-    }
+      '@': resolve(__dirname, 'src'),
+    },
   },
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
-    // 针对Electron的特殊配置
-    base: './',
-    emptyOutDir: true
+    emptyOutDir: true,
   },
   server: {
-    port: 5173
-  }
-})
+    port: 5173,
+  },
+});

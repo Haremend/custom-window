@@ -3,19 +3,19 @@
     <!-- Windows 风格工具栏 -->
     <header class="explorer-header">
       <div class="header-toolbar">
-        <button @click="addPath" class="toolbar-btn">
+        <button class="toolbar-btn" @click="addPath">
           <i class="icon-folder"></i>
           添加路径
         </button>
-        <button @click="refresh" class="toolbar-btn">
+        <button class="toolbar-btn" @click="refresh">
           <i class="icon-refresh"></i>
           刷新
         </button>
-        <button @click="showPathManager = true" class="toolbar-btn">
+        <button class="toolbar-btn" @click="showPathManager = true">
           <i class="icon-settings"></i>
           管理路径
         </button>
-        <button @click="showLogViewer = true" class="toolbar-btn">
+        <button class="toolbar-btn" @click="showLogViewer = true">
           <i class="icon-document"></i>
           查看日志
         </button>
@@ -31,13 +31,13 @@
         <div class="size-control">
           <label class="size-label">图片大小:</label>
           <input
-            type="range"
             v-model="imageSize"
+            type="range"
             min="200"
             max="1024"
             step="10"
             class="size-slider"
-          >
+          />
           <span class="size-value">{{ imageSize }}px</span>
         </div>
       </div>
@@ -46,7 +46,7 @@
     <!-- 主要内容区域 -->
     <main class="explorer-main">
       <!-- 文件夹列表 -->
-      <div class="folder-list-container" v-if="showFolderList">
+      <div v-if="showFolderList" class="folder-list-container">
         <div class="list-header">
           <div class="col-name" @click="setSortBy('name')">
             名称
@@ -84,14 +84,17 @@
             <div
               v-for="folder in sortedFolders"
               :key="folder.path"
-              @click="selectFolder(folder)"
               class="folder-row"
               :class="{ selected: selectedFolder?.path === folder.path }"
+              @click="selectFolder(folder)"
             >
               <div class="col-name">
                 <div class="folder-icon">
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                    <path d="M1.5 2.5h5l1.5 2h6v8a1 1 0 0 1-1 1h-10a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1z" fill="#4285f4"/>
+                    <path
+                      d="M1.5 2.5h5l1.5 2h6v8a1 1 0 0 1-1 1h-10a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1z"
+                      fill="#4285f4"
+                    />
                   </svg>
                 </div>
                 <span class="folder-name">{{ folder.name }}</span>
@@ -104,12 +107,12 @@
       </div>
 
       <!-- 图片列表视图 -->
-      <div class="image-list-container" v-if="selectedFolder">
+      <div v-if="selectedFolder" class="image-list-container">
         <div class="image-list-header">
           <div class="header-left">
-            <button @click="goBackToFolders" class="back-btn">
+            <button class="back-btn" @click="goBackToFolders">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <path d="M10 12l-4-4 4-4" stroke="currentColor" stroke-width="2" fill="none"/>
+                <path d="M10 12l-4-4 4-4" stroke="currentColor" stroke-width="2" fill="none" />
               </svg>
               返回上级
             </button>
@@ -138,7 +141,9 @@
             <div v-else class="image-grid-container">
               <div
                 class="image-grid-list"
-                :style="{ 'grid-template-columns': `repeat(auto-fill, minmax(${gridMinWidth}px, 1fr))` }"
+                :style="{
+                  'grid-template-columns': `repeat(auto-fill, minmax(${gridMinWidth}px, 1fr))`,
+                }"
               >
                 <div
                   v-for="image in allImages"
@@ -148,25 +153,29 @@
                   @click="openImageViewer(image)"
                 >
                   <div
+                    :ref="
+                      (el) => {
+                        if (el) observeImage(el, image.path);
+                      }
+                    "
                     class="image-thumb"
                     :style="imageThumbStyle"
-                    :ref="el => { if (el) observeImage(el, image.path) }"
                   >
                     <img
                       v-if="thumbnailUrls[image.path]"
                       :src="thumbnailUrls[image.path]"
                       :alt="image.name"
+                      decoding="async"
                       @error="handleImageError(image, $event)"
                       @load="handleImageLoad(image, $event)"
-                      decoding="async"
                     />
                     <img
                       v-else-if="imageUrls[image.path]"
                       :src="imageUrls[image.path]"
                       :alt="image.name"
+                      decoding="async"
                       @error="handleImageError(image, $event)"
                       @load="handleImageLoad(image, $event)"
-                      decoding="async"
                     />
                     <div v-else class="image-loading">
                       <div class="spinner small"></div>
@@ -191,7 +200,7 @@
       <div class="modal-content" @click.stop>
         <div class="modal-header">
           <h3>管理监控路径</h3>
-          <button @click="showPathManager = false" class="btn-close">×</button>
+          <button class="btn-close" @click="showPathManager = false">×</button>
         </div>
 
         <div class="modal-body">
@@ -205,18 +214,16 @@
               <div class="path-info">
                 <div class="path-name">{{ getFolderName(path) }}</div>
                 <div class="path-full">{{ path }}</div>
-                <div class="path-stats" v-if="getPathStats(path)">
+                <div v-if="getPathStats(path)" class="path-stats">
                   <span class="stat-badge">
                     {{ getPathStats(path).subfolders.length }} 个子文件夹
                   </span>
-                  <span class="stat-badge">
-                    {{ getTotalImagesInPath(path) }} 张图片
-                  </span>
+                  <span class="stat-badge"> {{ getTotalImagesInPath(path) }} 张图片 </span>
                 </div>
               </div>
-              <button @click="removePath(path)" class="btn-remove">
+              <button class="btn-remove" @click="removePath(path)">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                  <path d="M12 4L4 12M4 4l8 8" stroke="currentColor" stroke-width="2" fill="none"/>
+                  <path d="M12 4L4 12M4 4l8 8" stroke="currentColor" stroke-width="2" fill="none" />
                 </svg>
               </button>
             </div>
@@ -224,7 +231,7 @@
         </div>
 
         <div class="modal-footer">
-          <button @click="showPathManager = false" class="btn btn-secondary">关闭</button>
+          <button class="btn btn-secondary" @click="showPathManager = false">关闭</button>
         </div>
       </div>
     </div>
@@ -234,9 +241,9 @@
       <div class="modal-content modal-large" @click.stop>
         <div class="modal-header">
           <h3>系统日志</h3>
-          <button @click="showLogViewer = false" class="btn-close">×</button>
+          <button class="btn-close" @click="showLogViewer = false">×</button>
         </div>
-        <div class="modal-body" style="padding: 0; height: 70vh;">
+        <div class="modal-body" style="padding: 0; height: 70vh">
           <LogViewer />
         </div>
       </div>
@@ -245,17 +252,14 @@
 </template>
 
 <script>
-import logger from './utils/logger'
-import LogViewer from './components/LogViewer.vue'
-import { RecycleScroller, DynamicScroller, DynamicScrollerItem } from 'vue-virtual-scroller'
-import 'vue-virtual-scroller/dist/vue-virtual-scroller.css'
+import logger from './utils/logger';
+import LogViewer from './components/LogViewer.vue';
+// import { RecycleScroller, DynamicScroller, DynamicScrollerItem } from 'vue-virtual-scroller';
+import 'vue-virtual-scroller/dist/vue-virtual-scroller.css';
 
 export default {
   components: {
     LogViewer,
-    RecycleScroller,
-    DynamicScroller,
-    DynamicScrollerItem
   },
   data() {
     return {
@@ -285,179 +289,202 @@ export default {
       // 懒加载
       intersectionObserver: null, // Intersection Observer 实例
       visibleImageSet: new Set(), // 当前可见的图片集合
-    }
+    };
   },
   computed: {
     sortedFolders() {
-      const allFolders = []
+      const allFolders = [];
       this.folderStats.forEach((stats) => {
         if (stats && stats.subfolders) {
-          stats.subfolders.forEach(folder => {
-            allFolders.push(folder)
-          })
+          stats.subfolders.forEach((folder) => {
+            allFolders.push(folder);
+          });
         }
-      })
+      });
 
       return allFolders.sort((a, b) => {
-        let comparison = 0
+        let comparison = 0;
         switch (this.sortBy) {
           case 'name':
-            comparison = a.name.localeCompare(b.name)
-            break
+            comparison = a.name.localeCompare(b.name);
+            break;
           case 'time':
-            comparison = new Date(a.lastModified) - new Date(b.lastModified)
-            break
+            comparison = new Date(a.lastModified) - new Date(b.lastModified);
+            break;
           case 'count':
-            comparison = a.imageCount - b.imageCount
-            break
+            comparison = a.imageCount - b.imageCount;
+            break;
         }
-        return this.sortOrder === 'asc' ? comparison : -comparison
-      })
+        return this.sortOrder === 'asc' ? comparison : -comparison;
+      });
     },
     totalImages() {
-      return this.sortedFolders.reduce((total, folder) => total + folder.imageCount, 0)
+      return this.sortedFolders.reduce((total, folder) => total + folder.imageCount, 0);
     },
 
     // 计算图片容器尺寸，保持1.25高宽比（高:宽 = 1.25:1）
     imageContainerStyle() {
-      const height = this.imageSize
-      const width = height / 1.25  // 高:宽 = 1.25:1，所以宽 = 高/1.25
+      const height = this.imageSize;
+      const width = height / 1.25; // 高:宽 = 1.25:1，所以宽 = 高/1.25
 
       // 确保最小宽度和合理的最大宽度
-      const finalWidth = Math.max(100, Math.min(width, 400))
+      const finalWidth = Math.max(100, Math.min(width, 400));
 
       return {
         height: `${height}px`,
-        width: `${finalWidth}px`
-      }
+        width: `${finalWidth}px`,
+      };
     },
 
     // 计算图片显示区域尺寸
     imageThumbStyle() {
-      const height = this.imageSize * 0.8 // 图片区域占容器的80%
+      const height = this.imageSize * 0.8; // 图片区域占容器的80%
       return {
-        height: `${height}px`
-      }
+        height: `${height}px`,
+      };
     },
 
     // 计算网格列的最小宽度（基于图片容器宽度）
     gridMinWidth() {
-      const imageWidth = this.imageSize / 1.25 // 根据1.25比例计算宽度
+      const imageWidth = this.imageSize / 1.25; // 根据1.25比例计算宽度
       // 确保最小宽度不会太大，保证至少显示2列
-      const minWidth = Math.max(100, Math.min(imageWidth + 20, 250))
-      return minWidth
+      const minWidth = Math.max(100, Math.min(imageWidth + 20, 250));
+      return minWidth;
     },
 
     // 响应式断点计算
     responsiveGridColumns() {
       // 可以根据窗口大小动态调整列数
-      const containerWidth = this.$el?.clientWidth || 800
-      const minItemWidth = this.gridMinWidth
-      const columns = Math.floor(containerWidth / minItemWidth)
-      return Math.max(1, Math.min(columns, 8)) // 限制在1-8列之间
+      const containerWidth = this.$el?.clientWidth || 800;
+      const minItemWidth = this.gridMinWidth;
+      const columns = Math.floor(containerWidth / minItemWidth);
+      return Math.max(1, Math.min(columns, 8)); // 限制在1-8列之间
+    },
+  },
+  async mounted() {
+    logger.info('App component mounting started');
+    logger.info('Electron API available:', !!window.electronAPI);
+
+    // 启动缓存清理定时器
+    this.startCacheCleanup();
+    // 初始化 Intersection Observer
+    this.initIntersectionObserver();
+
+    try {
+      await this.loadConfig();
+      logger.info('Configuration loading completed');
+    } catch (error) {
+      logger.error('Failed to load configuration:', error);
     }
+  },
+
+  beforeUnmount() {
+    // 清理定时器
+    this.stopCacheCleanup();
+    // 停止观察
+    this.stopObserving();
   },
   methods: {
     async addPath() {
-      logger.info('Starting to add path')
+      logger.info('Starting to add path');
       try {
         if (window.electronAPI) {
-          logger.debug('Calling Electron folder selection dialog')
-          const folderPath = await window.electronAPI.selectFolder()
+          logger.debug('Calling Electron folder selection dialog');
+          const folderPath = await window.electronAPI.selectFolder();
 
           if (folderPath) {
-            logger.info('User selected folder:', folderPath)
+            logger.info('User selected folder:', folderPath);
 
             if (!this.watchedPaths.includes(folderPath)) {
-              this.watchedPaths.push(folderPath)
-              this.currentPath = folderPath
-              logger.debug('Starting to refresh folder statistics')
-              await this.refreshFolderStats(folderPath)
-              logger.debug('Starting to save configuration')
-              await this.saveConfig()
-              logger.info('Path added successfully:', folderPath)
+              this.watchedPaths.push(folderPath);
+              this.currentPath = folderPath;
+              logger.debug('Starting to refresh folder statistics');
+              await this.refreshFolderStats(folderPath);
+              logger.debug('Starting to save configuration');
+              await this.saveConfig();
+              logger.info('Path added successfully:', folderPath);
             } else {
-              logger.warn('Path already exists:', folderPath)
-              alert('该路径已存在')
+              logger.warn('Path already exists:', folderPath);
+              alert('该路径已存在');
             }
           } else {
-            logger.info('User cancelled folder selection')
+            logger.info('User cancelled folder selection');
           }
         } else {
-          logger.error('Electron API not available')
-          alert('Electron API not available')
+          logger.error('Electron API not available');
+          alert('Electron API not available');
         }
       } catch (error) {
-        logger.error('Failed to add path:', error)
-        alert('添加路径失败: ' + error.message)
+        logger.error('Failed to add path:', error);
+        alert('添加路径失败: ' + error.message);
       }
     },
 
     async refresh() {
-      this.loading = true
+      this.loading = true;
       try {
         for (const path of this.watchedPaths) {
-          await this.refreshFolderStats(path)
+          await this.refreshFolderStats(path);
         }
-        await this.saveConfig()
+        await this.saveConfig();
       } catch (error) {
-        console.error('Error refreshing:', error)
-        alert('刷新失败: ' + error.message)
+        logger.error('Error refreshing:', error);
+        alert('刷新失败: ' + error.message);
       } finally {
-        this.loading = false
+        this.loading = false;
       }
     },
 
     async removePath(pathToRemove) {
       try {
-        this.watchedPaths = this.watchedPaths.filter(path => path !== pathToRemove)
-        this.folderStats.delete(pathToRemove)
-        await this.saveConfig()
+        this.watchedPaths = this.watchedPaths.filter((path) => path !== pathToRemove);
+        this.folderStats.delete(pathToRemove);
+        await this.saveConfig();
 
         if (this.watchedPaths.length > 0) {
-          this.currentPath = this.watchedPaths[0]
+          this.currentPath = this.watchedPaths[0];
         } else {
-          this.currentPath = ''
+          this.currentPath = '';
         }
 
         if (this.selectedFolder && this.selectedFolder.path.startsWith(pathToRemove)) {
-          this.selectedFolder = null
-          this.allImages = []
+          this.selectedFolder = null;
+          this.allImages = [];
         }
       } catch (error) {
-        console.error('Error removing path:', error)
-        alert('移除路径失败: ' + error.message)
+        logger.error('Error removing path:', error);
+        alert('移除路径失败: ' + error.message);
       }
     },
 
     async loadConfig() {
       try {
-        console.log('[DEBUG] loadConfig: checking electronAPI')
+        logger.debug('loadConfig: checking electronAPI');
         if (window.electronAPI) {
-          console.log('[DEBUG] loadConfig: calling loadConfig')
-          const config = await window.electronAPI.loadConfig()
-          console.log('[DEBUG] loadConfig: result:', JSON.stringify(config))
+          logger.debug('loadConfig: calling loadConfig');
+          const config = await window.electronAPI.loadConfig();
+          logger.debug('loadConfig: result:', JSON.stringify(config));
           if (config && config.watchedPaths && config.watchedPaths.length > 0) {
-            this.watchedPaths = config.watchedPaths || []
-            this.currentPath = this.watchedPaths[0] || ''
+            this.watchedPaths = config.watchedPaths || [];
+            this.currentPath = this.watchedPaths[0] || '';
             for (const path of this.watchedPaths) {
-              await this.refreshFolderStats(path)
+              await this.refreshFolderStats(path);
             }
           } else {
             // 如果没有配置或配置为空，自动添加测试路径
-            logger.info('No config or empty config found, adding default test path')
-            this.watchedPaths = ['D:\\Joy\\SDWebImg']
-            this.currentPath = this.watchedPaths[0]
-            await this.refreshFolderStats(this.currentPath)
+            logger.info('No config or empty config found, adding default test path');
+            this.watchedPaths = ['D:\\Joy\\SDWebImg'];
+            this.currentPath = this.watchedPaths[0];
+            await this.refreshFolderStats(this.currentPath);
           }
         } else {
-          console.log('[DEBUG] loadConfig: electronAPI not available')
+          logger.debug('loadConfig: electronAPI not available');
         }
       } catch (error) {
-        console.error('[DEBUG] Error loading config:', error)
+        logger.error('Error loading config:', error);
       } finally {
-        this.configLoaded = true
-        console.log('[DEBUG] loadConfig completed')
+        this.configLoaded = true;
+        logger.debug('loadConfig completed');
       }
     },
 
@@ -466,130 +493,130 @@ export default {
         if (window.electronAPI) {
           const config = {
             watchedPaths: this.watchedPaths,
-            lastUpdated: new Date().toISOString()
-          }
-          await window.electronAPI.saveConfig(config)
+            lastUpdated: new Date().toISOString(),
+          };
+          await window.electronAPI.saveConfig(config);
         }
       } catch (error) {
-        console.error('Error saving config:', error)
+        logger.error('Error saving config:', error);
       }
     },
 
     async refreshFolderStats(folderPath) {
       try {
         if (window.electronAPI) {
-          const stats = await window.electronAPI.getFolderStats(folderPath)
+          const stats = await window.electronAPI.getFolderStats(folderPath);
           if (stats) {
-            this.folderStats.set(folderPath, stats)
+            this.folderStats.set(folderPath, stats);
           }
         }
       } catch (error) {
-        logger.error('Error refreshing folder stats:', error, { path: folderPath })
+        logger.error('Error refreshing folder stats:', error, { path: folderPath });
       }
     },
 
     async selectFolder(folder) {
-      logger.info('Selecting folder:', folder.name, folder.path)
+      logger.info('Selecting folder:', folder.name, folder.path);
       try {
-        this.selectedFolder = folder
-        this.allImages = []
-        this.loadedImages.clear()
-        this.showFolderList = false
+        this.selectedFolder = folder;
+        this.allImages = [];
+        this.loadedImages.clear();
+        this.showFolderList = false;
 
         if (window.electronAPI) {
-          logger.debug('Starting to load images from folder')
-          this.loadingImages = true
+          logger.debug('Starting to load images from folder');
+          this.loadingImages = true;
 
-          const startTime = Date.now()
-          const images = await window.electronAPI.getImagesInFolder(folder.path)
-          const loadTime = Date.now() - startTime
+          const startTime = Date.now();
+          const images = await window.electronAPI.getImagesInFolder(folder.path);
+          const loadTime = Date.now() - startTime;
 
-          this.allImages = images || []
+          this.allImages = images || [];
 
-          logger.info(`Image loading completed: ${images.length} images loaded in ${loadTime}ms`)
+          logger.info(`Image loading completed: ${images.length} images loaded in ${loadTime}ms`);
 
           // 为图片处理缩略图（使用懒加载）
           if (images.length > 0) {
             // 只加载已存在的缩略图，缺失的会在滚动到时生成
-            await this.loadExistingThumbnails(images)
+            await this.loadExistingThumbnails(images);
           }
 
           if (images.length === 0) {
-            logger.warn('No image files found in folder:', folder.path)
+            logger.warn('No image files found in folder:', folder.path);
           }
         } else {
-          logger.error('Electron API not available, cannot load images')
+          logger.error('Electron API not available, cannot load images');
         }
       } catch (error) {
-        logger.error('Failed to select folder:', error, { folder: folder.path })
-        alert('加载文件夹失败: ' + error.message)
+        logger.error('Failed to select folder:', error, { folder: folder.path });
+        alert('加载文件夹失败: ' + error.message);
       } finally {
-        this.loadingImages = false
+        this.loadingImages = false;
       }
     },
 
     goBackToFolders() {
-      this.showFolderList = true
-      this.selectedFolder = null
-      this.allImages = []
+      this.showFolderList = true;
+      this.selectedFolder = null;
+      this.allImages = [];
     },
 
     setSortBy(sortType) {
       if (this.sortBy === sortType) {
-        this.toggleSortOrder()
+        this.toggleSortOrder();
       } else {
-        this.sortBy = sortType
-        this.sortOrder = 'desc'
+        this.sortBy = sortType;
+        this.sortOrder = 'desc';
       }
     },
 
     toggleSortOrder() {
-      this.sortOrder = this.sortOrder === 'asc' ? 'desc' : 'asc'
+      this.sortOrder = this.sortOrder === 'asc' ? 'desc' : 'asc';
     },
 
     async getImageUrl(imagePath) {
       if (!imagePath) {
-        logger.warn('Attempting to get image URL for empty path')
-        return ''
+        logger.warn('Attempting to get image URL for empty path');
+        return '';
       }
 
       if (window.electronAPI && window.electronAPI.getImageDataUrl) {
         try {
-          const dataUrl = await window.electronAPI.getImageDataUrl(imagePath)
-          return dataUrl
+          const dataUrl = await window.electronAPI.getImageDataUrl(imagePath);
+          return dataUrl;
         } catch (error) {
-          logger.error('Failed to generate image Data URL:', error.message, { path: imagePath })
-          return ''
+          logger.error('Failed to generate image Data URL:', error.message, { path: imagePath });
+          return '';
         }
       }
 
-      logger.debug('Using original path as URL (non-Electron environment):', imagePath)
-      return imagePath
+      logger.debug('Using original path as URL (non-Electron environment):', imagePath);
+      return imagePath;
     },
 
     getFileName(path) {
-      return path?.split(/[\\/]/).pop() || ''
+      return path?.split(/[\\/]/).pop() || '';
     },
 
     getFolderName(path) {
-      return this.getFileName(path)
+      return this.getFileName(path);
     },
 
     getPathStats(path) {
-      return this.folderStats.get(path)
+      return this.folderStats.get(path);
     },
 
     getTotalImagesInPath(path) {
-      const stats = this.getPathStats(path)
-      if (!stats) return 0
-      return stats.subfolders.reduce((total, folder) => total + folder.imageCount, 0)
+      const stats = this.getPathStats(path);
+      if (!stats) return 0;
+      return stats.subfolders.reduce((total, folder) => total + folder.imageCount, 0);
     },
 
     formatDate(date) {
       return new Date(date).toLocaleDateString('zh-CN', {
         month: 'short',
-        day: 'numeric'
-      })
+        day: 'numeric',
+      });
     },
 
     formatDateTime(date) {
@@ -598,22 +625,22 @@ export default {
         month: '2-digit',
         day: '2-digit',
         hour: '2-digit',
-        minute: '2-digit'
-      })
+        minute: '2-digit',
+      });
     },
 
     formatFileSize(bytes) {
-      if (!bytes) return '未知大小'
-      const sizes = ['B', 'KB', 'MB', 'GB']
-      const i = Math.floor(Math.log(bytes) / Math.log(1024))
-      return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i]
+      if (!bytes) return '未知大小';
+      const sizes = ['B', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(1024));
+      return Math.round((bytes / Math.pow(1024, i)) * 100) / 100 + ' ' + sizes[i];
     },
 
     openImageViewer(image) {
-      const img = new Image()
-      img.src = this.getImageUrl(image.path)
+      const img = new Image();
+      img.src = this.getImageUrl(image.path);
       img.onload = () => {
-        const newWindow = window.open('', '_blank')
+        const newWindow = window.open('', '_blank');
         if (newWindow) {
           newWindow.document.write(`
             <html>
@@ -628,118 +655,120 @@ export default {
                 <img src="${this.getImageUrl(image.path)}" />
               </body>
             </html>
-          `)
-          newWindow.document.close()
+          `);
+          newWindow.document.close();
         }
-      }
+      };
     },
 
-    handleImageLoad(image, event) {
+    handleImageLoad(image) {
       logger.debug('Image loaded successfully:', {
         name: image.name,
-        path: image.path
-      })
+        path: image.path,
+      });
     },
 
     handleImageError(image, event) {
-      const errorMsg = event.target.error?.message || 'Unknown error'
+      const errorMsg = event.target.error?.message || 'Unknown error';
       logger.error('Failed to load image:', {
         name: image.name,
         path: image.path,
-        error: errorMsg
-      })
+        error: errorMsg,
+      });
 
       // 如果缩略图加载失败，尝试使用原始图片
       if (this.thumbnailUrls[image.path] && this.thumbnailUrls[image.path].startsWith('app://')) {
-        logger.info('Thumbnail failed, trying original image for:', image.name)
-        this.loadOriginalImage(image.path)
+        logger.info('Thumbnail failed, trying original image for:', image.name);
+        this.loadOriginalImage(image.path);
       }
     },
 
     async generateThumbnails(images) {
-      logger.info('Starting thumbnail generation for', images.length, 'images')
-      this.isGeneratingThumbnails = true
+      logger.info('Starting thumbnail generation for', images.length, 'images');
+      this.isGeneratingThumbnails = true;
 
       try {
         // 过滤出还没有缩略图的图片
-        const imagesNeedingThumbnails = images.filter(img => !this.thumbnailUrls[img.path])
+        const imagesNeedingThumbnails = images.filter((img) => !this.thumbnailUrls[img.path]);
 
         if (imagesNeedingThumbnails.length === 0) {
-          logger.info('All images already have thumbnails cached')
-          this.isGeneratingThumbnails = false
-          return
+          logger.info('All images already have thumbnails cached');
+          this.isGeneratingThumbnails = false;
+          return;
         }
 
-        logger.info(`Need to generate thumbnails for ${imagesNeedingThumbnails.length} images`)
+        logger.info(`Need to generate thumbnails for ${imagesNeedingThumbnails.length} images`);
 
         // 分批处理缩略图生成，避免一次性处理太多图片
-        const batchSize = 20
+        const batchSize = 20;
         for (let i = 0; i < imagesNeedingThumbnails.length; i += batchSize) {
-          const batch = imagesNeedingThumbnails.slice(i, i + batchSize)
-          const imagePaths = batch.map(img => img.path)
+          const batch = imagesNeedingThumbnails.slice(i, i + batchSize);
+          const imagePaths = batch.map((img) => img.path);
 
           try {
-            const results = await window.electronAPI.generateThumbnails(imagePaths)
+            const results = await window.electronAPI.generateThumbnails(imagePaths);
 
             // 处理结果
             for (const result of results) {
               if (result.success) {
                 // 使用 app:// 协议访问本地文件
-                this.thumbnailUrls[result.originalPath] = `app://${result.thumbnailPath}`
+                this.thumbnailUrls[result.originalPath] = `app://${result.thumbnailPath}`;
               } else {
-                logger.error('Failed to generate thumbnail:', result.error, { path: result.originalPath })
+                logger.error('Failed to generate thumbnail:', result.error, {
+                  path: result.originalPath,
+                });
                 // 失败时立即加载原始图片的 Data URL
-                this.loadOriginalImage(result.originalPath)
+                this.loadOriginalImage(result.originalPath);
               }
             }
           } catch (error) {
-            logger.error('Error generating thumbnail batch:', error.message)
+            logger.error('Error generating thumbnail batch:', error.message);
             // 出错时加载原始图片
             for (const img of batch) {
-              this.loadOriginalImage(img.path)
+              this.loadOriginalImage(img.path);
             }
           }
 
           // 给 UI 一点更新时间
-          await new Promise(resolve => setTimeout(resolve, 10))
+          await new Promise((resolve) => setTimeout(resolve, 10));
         }
 
-        logger.info('Thumbnail generation completed')
+        logger.info('Thumbnail generation completed');
       } catch (error) {
-        logger.error('Error in thumbnail generation:', error.message)
+        logger.error('Error in thumbnail generation:', error.message);
       } finally {
-        this.isGeneratingThumbnails = false
+        this.isGeneratingThumbnails = false;
       }
     },
 
     async loadOriginalImage(imagePath) {
       // 直接加载原始图片的 Data URL 作为回退
       try {
-        const dataUrl = await this.getImageUrl(imagePath)
+        const dataUrl = await this.getImageUrl(imagePath);
         if (dataUrl) {
-          this.thumbnailUrls[imagePath] = dataUrl
+          this.thumbnailUrls[imagePath] = dataUrl;
         } else {
           // 使用占位图
-          this.thumbnailUrls[imagePath] = this.getPlaceholderImage()
+          this.thumbnailUrls[imagePath] = this.getPlaceholderImage();
         }
       } catch (error) {
-        logger.error('Failed to load original image:', error.message, { path: imagePath })
+        logger.error('Failed to load original image:', error.message, { path: imagePath });
         // 使用占位图
-        this.thumbnailUrls[imagePath] = this.getPlaceholderImage()
+        this.thumbnailUrls[imagePath] = this.getPlaceholderImage();
       }
     },
 
     getPlaceholderImage() {
       // 返回一个简单的 SVG 占位图
-      return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjBmMGYwIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPuWbvueJh+WkqeivlTwvdGV4dD48L3N2Zz4='
+      return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjBmMGYwIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPuWbvueJh+WkqeivlTwvdGV4dD48L3N2Zz4=';
     },
 
     async loadExistingThumbnails(images) {
       // 检查哪些图片已经有缩略图缓存
       for (const image of images) {
         try {
-          const thumbnailPath = await window.electronAPI.getThumbnail(image.path)
-          this.thumbnailUrls[image.path] = `app://${thumbnailPath}`
+          const thumbnailPath = await window.electronAPI.getThumbnail(image.path);
+          this.thumbnailUrls[image.path] = `app://${thumbnailPath}`;
         } catch (error) {
           // 缩略图不存在，后续会生成
         }
@@ -750,12 +779,12 @@ export default {
       // Preload URLs for all images (fallback for original images)
       for (const image of images) {
         try {
-          const dataUrl = await this.getImageUrl(image.path)
+          const dataUrl = await this.getImageUrl(image.path);
           if (dataUrl) {
-            this.imageUrls[image.path] = dataUrl
+            this.imageUrls[image.path] = dataUrl;
           }
         } catch (error) {
-          logger.error('Failed to preload image URL:', error.message, { image: image.name })
+          logger.error('Failed to preload image URL:', error.message, { image: image.name });
         }
       }
     },
@@ -764,134 +793,111 @@ export default {
     cleanupCache() {
       // 清理 thumbnailUrls 缓存
       if (Object.keys(this.thumbnailUrls).length > this.maxCacheSize) {
-        logger.info('Cleaning up thumbnail cache...')
-        const entries = Object.entries(this.thumbnailUrls)
-        const toRemove = entries.slice(0, entries.length - this.maxCacheSize)
+        logger.info('Cleaning up thumbnail cache...');
+        const entries = Object.entries(this.thumbnailUrls);
+        const toRemove = entries.slice(0, entries.length - this.maxCacheSize);
         toRemove.forEach(([path]) => {
-          delete this.thumbnailUrls[path]
-        })
-        logger.info(`Cleaned up ${toRemove.length} thumbnail cache entries`)
+          delete this.thumbnailUrls[path];
+        });
+        logger.info(`Cleaned up ${toRemove.length} thumbnail cache entries`);
       }
 
       // 清理 imageUrls 缓存
       if (Object.keys(this.imageUrls).length > this.maxCacheSize) {
-        logger.info('Cleaning up image cache...')
-        const entries = Object.entries(this.imageUrls)
-        const toRemove = entries.slice(0, entries.length - this.maxCacheSize)
+        logger.info('Cleaning up image cache...');
+        const entries = Object.entries(this.imageUrls);
+        const toRemove = entries.slice(0, entries.length - this.maxCacheSize);
         toRemove.forEach(([path]) => {
-          delete this.imageUrls[path]
-        })
-        logger.info(`Cleaned up ${toRemove.length} image cache entries`)
+          delete this.imageUrls[path];
+        });
+        logger.info(`Cleaned up ${toRemove.length} image cache entries`);
       }
     },
 
     // 启动缓存清理定时器
     startCacheCleanup() {
       if (this.cacheCleanupInterval) {
-        clearInterval(this.cacheCleanupInterval)
+        clearInterval(this.cacheCleanupInterval);
       }
       this.cacheCleanupInterval = setInterval(() => {
-        this.cleanupCache()
-      }, 300000) // 5分钟清理一次
+        this.cleanupCache();
+      }, 300000); // 5分钟清理一次
     },
 
     // 停止缓存清理定时器
     stopCacheCleanup() {
       if (this.cacheCleanupInterval) {
-        clearInterval(this.cacheCleanupInterval)
-        this.cacheCleanupInterval = null
+        clearInterval(this.cacheCleanupInterval);
+        this.cacheCleanupInterval = null;
       }
     },
 
     // 初始化 Intersection Observer
     initIntersectionObserver() {
       if (this.intersectionObserver) {
-        this.intersectionObserver.disconnect()
+        this.intersectionObserver.disconnect();
       }
 
       this.intersectionObserver = new IntersectionObserver(
         (entries) => {
-          entries.forEach(entry => {
-            const imagePath = entry.target.dataset.imagePath
+          entries.forEach((entry) => {
+            const imagePath = entry.target.dataset.imagePath;
             if (entry.isIntersecting) {
               if (imagePath && !this.visibleImageSet.has(imagePath)) {
-                this.visibleImageSet.add(imagePath)
-                this.preloadImageIfNeeded(imagePath)
+                this.visibleImageSet.add(imagePath);
+                this.preloadImageIfNeeded(imagePath);
               }
             } else {
               if (imagePath) {
-                this.visibleImageSet.delete(imagePath)
+                this.visibleImageSet.delete(imagePath);
               }
             }
-          })
+          });
         },
         {
           rootMargin: '100px', // 提前100px开始加载
-          threshold: 0.1
+          threshold: 0.1,
         }
-      )
+      );
     },
 
     // 观察图片元素
     observeImage(element, imagePath) {
       if (element && this.intersectionObserver && imagePath) {
-        element.dataset.imagePath = imagePath
-        this.intersectionObserver.observe(element)
+        element.dataset.imagePath = imagePath;
+        this.intersectionObserver.observe(element);
       }
     },
 
     // 预加载图片
     async preloadImageIfNeeded(imagePath) {
       if (this.thumbnailUrls[imagePath] || this.imageUrls[imagePath]) {
-        return // 已经加载过了
+        return; // 已经加载过了
       }
 
       try {
         // 优先尝试加载缩略图
-        const thumbnailPath = await window.electronAPI.getThumbnail(imagePath)
+        const thumbnailPath = await window.electronAPI.getThumbnail(imagePath);
         if (thumbnailPath) {
-          this.thumbnailUrls[imagePath] = `app://${thumbnailPath}`
+          this.thumbnailUrls[imagePath] = `app://${thumbnailPath}`;
         }
       } catch (error) {
-        logger.warn('Failed to get thumbnail, loading original:', error.message)
+        logger.warn('Failed to get thumbnail, loading original:', error.message);
         // 失败时加载原始图片
-        this.loadOriginalImage(imagePath)
+        this.loadOriginalImage(imagePath);
       }
     },
 
     // 停止观察
     stopObserving() {
       if (this.intersectionObserver) {
-        this.intersectionObserver.disconnect()
-        this.intersectionObserver = null
+        this.intersectionObserver.disconnect();
+        this.intersectionObserver = null;
       }
-      this.visibleImageSet.clear()
-    }
+      this.visibleImageSet.clear();
+    },
   },
-  async mounted() {
-    logger.info('App component mounting started')
-    logger.info('Electron API available:', !!window.electronAPI)
-
-    // 启动缓存清理定时器
-    this.startCacheCleanup()
-    // 初始化 Intersection Observer
-    this.initIntersectionObserver()
-
-    try {
-      await this.loadConfig()
-      logger.info('Configuration loading completed')
-    } catch (error) {
-      logger.error('Failed to load configuration:', error)
-    }
-  },
-
-  beforeUnmount() {
-    // 清理定时器
-    this.stopCacheCleanup()
-    // 停止观察
-    this.stopObserving()
-  }
-}
+};
 </script>
 
 <style scoped>
@@ -1100,8 +1106,12 @@ export default {
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .empty-state {
@@ -1372,8 +1382,12 @@ export default {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .modal-content {

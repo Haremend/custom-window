@@ -9,7 +9,7 @@ class Logger {
       DEBUG: 0,
       INFO: 1,
       WARN: 2,
-      ERROR: 3
+      ERROR: 3,
     };
 
     this.currentLevel = this.levels.DEBUG;
@@ -25,7 +25,7 @@ class Logger {
    * 设置日志级别
    */
   setLevel(level) {
-    if (this.levels.hasOwnProperty(level)) {
+    if (Object.prototype.hasOwnProperty.call(this.levels, level)) {
       this.currentLevel = this.levels[level];
       console.log(`[Logger] Log level set to: ${level}`);
     }
@@ -35,9 +35,7 @@ class Logger {
    * 获取当前日志级别
    */
   getLevel() {
-    return Object.keys(this.levels).find(
-      key => this.levels[key] === this.currentLevel
-    );
+    return Object.keys(this.levels).find((key) => this.levels[key] === this.currentLevel);
   }
 
   /**
@@ -50,7 +48,7 @@ class Logger {
         level,
         message,
         data,
-        id: this.generateId()
+        id: this.generateId(),
       };
 
       // 控制台输出
@@ -165,7 +163,7 @@ class Logger {
    */
   getLogs(level = null) {
     if (level) {
-      return this.logs.filter(log => log.level === level);
+      return this.logs.filter((log) => log.level === level);
     }
     return [...this.logs];
   }
@@ -174,7 +172,7 @@ class Logger {
    * 按时间范围获取日志
    */
   getLogsByTimeRange(startTime, endTime) {
-    return this.logs.filter(log => {
+    return this.logs.filter((log) => {
       const logTime = new Date(log.timestamp);
       return logTime >= startTime && logTime <= endTime;
     });
@@ -184,9 +182,10 @@ class Logger {
    * 搜索日志
    */
   searchLogs(keyword) {
-    return this.logs.filter(log =>
-      log.message.toLowerCase().includes(keyword.toLowerCase()) ||
-      (log.data && JSON.stringify(log.data).toLowerCase().includes(keyword.toLowerCase()))
+    return this.logs.filter(
+      (log) =>
+        log.message.toLowerCase().includes(keyword.toLowerCase()) ||
+        (log.data && JSON.stringify(log.data).toLowerCase().includes(keyword.toLowerCase()))
     );
   }
 
@@ -227,10 +226,10 @@ class Logger {
       warn: 0,
       error: 0,
       oldestLog: null,
-      newestLog: null
+      newestLog: null,
     };
 
-    this.logs.forEach(log => {
+    this.logs.forEach((log) => {
       stats[log.level.toLowerCase()]++;
     });
 
